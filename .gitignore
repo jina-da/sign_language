@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+ai_server/data/raw/
+ai_server/data/processed/
+*.npy
+*.zip
+*.tar
