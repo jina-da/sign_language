@@ -3,6 +3,7 @@ AI 서버
 - 운용서버로부터 TCP 9100으로 keypoint 수신
 - Transformer 모델로 추론
 - 결과 반환: {word_id, confidence, predicted_word}
+- 모델 무중단 교체 지원
 """
 
 import asyncio
@@ -10,17 +11,22 @@ import json
 import numpy as np
 import torch
 from pathlib import Path
-
-from model import build_model
 from datetime import datetime
 
+from model import build_model
+
 # ── 설정 ───────────────────────────────────────────────
-HOST        = "0.0.0.0"   # 모든 인터페이스에서 수신
-PORT        = 9100         # 운용서버 ↔ AI서버 포트
+HOST        = "0.0.0.0"
+PORT        = 9100
 MODEL_PATH  = Path("data/models/best_model.pt")
 LABELS_PATH = Path("data/processed/labels.npy")
 NUM_CLASSES = 1000
 DEVICE      = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def now() -> str:
+    """현재 시간 문자열 반환 (로그용)"""
+    return datetime.now().strftime("%H:%M:%S")
 
 
 class AIServer:
@@ -28,26 +34,49 @@ class AIServer:
     AI 추론 서버
     - asyncio 기반 비동기 TCP 서버
     - 여러 운용서버 요청 동시 처리 가능
+    - 모델 무중단 교체 지원 (reload_model 호출)
     """
 
     def __init__(self):
         self.model  = None
         self.labels = None  # 라벨 번호 → 단어명 매핑
+        self.lock   = asyncio.Lock()  # 모델 교체 중 추론 방지
 
-    def load_model(self):
-        """모델 및 라벨 로드"""
-        print(f"모델 로드 중... ({DEVICE})")
+    def load_model(self, model_path: Path = MODEL_PATH):
+        """
+        모델 및 라벨 로드
+        model_path: 로드할 모델 파일 경로 (기본: best_model.pt)
+        """
+        print(f"[{now()}] 모델 로드 중... ({DEVICE})")
 
-        # 모델 구조 생성 후 가중치 로드
-        self.model = build_model(NUM_CLASSES).to(DEVICE)
-        checkpoint = torch.load(MODEL_PATH, map_location=DEVICE)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        self.model.eval()  # 추론 모드
+        model = build_model(NUM_CLASSES).to(DEVICE)
+        checkpoint = torch.load(model_path, map_location=DEVICE)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.eval()  # 추론 모드
 
-        # 라벨 로드
+        self.model  = model
         self.labels = np.load(LABELS_PATH, allow_pickle=True)
 
-        print(f"모델 로드 완료 (val_acc: {checkpoint['val_acc']:.4f})")
+        print(f"[{now()}] 모델 로드 완료 (val_acc: {checkpoint['val_acc']:.4f})")
+
+    async def reload_model(self, model_path: Path = MODEL_PATH):
+        """
+        모델 무중단 교체
+        - 새 모델 로드 완료 후 교체 (추론 중단 없음)
+        - lock으로 교체 중 추론 방지
+        """
+        print(f"[{now()}] 모델 교체 시작...")
+
+        # 새 모델 미리 로드
+        new_model = build_model(NUM_CLASSES).to(DEVICE)
+        checkpoint = torch.load(model_path, map_location=DEVICE)
+        new_model.load_state_dict(checkpoint['model_state_dict'])
+        new_model.eval()
+
+        # lock 걸고 교체 (추론 중이면 대기)
+        async with self.lock:
+            self.model = new_model
+            print(f"[{now()}] 모델 교체 완료 (val_acc: {checkpoint['val_acc']:.4f})")
 
     @torch.no_grad()
     def infer(self, keypoints: list) -> dict:
@@ -61,9 +90,9 @@ class AIServer:
         x   = torch.tensor(seq).unsqueeze(0).to(DEVICE)  # (1, T, 134)
 
         # 추론
-        logits = self.model(x)                    # (1, 1000)
-        probs  = torch.softmax(logits, dim=1)     # 확률값으로 변환
-        confidence, pred_idx = probs.max(dim=1)   # 가장 높은 확률
+        logits     = self.model(x)                    # (1, 1000)
+        probs      = torch.softmax(logits, dim=1)     # 확률값으로 변환
+        confidence, pred_idx = probs.max(dim=1)       # 가장 높은 확률
 
         word_id   = int(pred_idx.item())
         word_name = str(self.labels[word_id])
@@ -81,8 +110,7 @@ class AIServer:
         프로토콜: 4바이트 길이 헤더 + JSON 바디
         """
         addr = writer.get_extra_info('peername')
-        now  = datetime.now().strftime("%H:%M:%S")
-        print(f"[{now}] 운용서버 연결: {addr}")
+        print(f"[{now()}] 운용서버 연결: {addr}")
 
         try:
             while True:
@@ -94,15 +122,27 @@ class AIServer:
                 body = await reader.readexactly(msg_len)
                 data = json.loads(body.decode('utf-8'))
 
-                # 3. 추론
-                keypoints = data.get('keypoints')  # [[x,y,...] × T]
-                if keypoints is None:
-                    response = {"error": "keypoints 없음"}
-                else:
-                    response = self.infer(keypoints)
+                # 3. 요청 타입 확인
+                req_type = data.get('type', 'infer')
 
-                now = datetime.now().strftime("%H:%M:%S")
-                print(f"[{now}] 추론 결과: {response['word']} (confidence: {response['confidence']:.4f})")
+                if req_type == 'reload':
+                    # 모델 교체 요청 (운용서버 → AI서버)
+                    model_path = data.get('model_path', str(MODEL_PATH))
+                    await self.reload_model(Path(model_path))
+                    response = {"status": "ok", "message": "모델 교체 완료"}
+
+                elif req_type == 'infer':
+                    # 추론 요청
+                    keypoints = data.get('keypoints')
+                    if keypoints is None:
+                        response = {"error": "keypoints 없음"}
+                    else:
+                        # lock으로 모델 교체 중 추론 방지
+                        async with self.lock:
+                            response = self.infer(keypoints)
+                        print(f"[{now()}] 추론 결과: {response['word']} (confidence: {response['confidence']:.4f})")
+                else:
+                    response = {"error": f"알 수 없는 요청 타입: {req_type}"}
 
                 # 4. 결과 반환 (4바이트 헤더 + JSON)
                 resp_body   = json.dumps(response, ensure_ascii=False).encode('utf-8')
@@ -111,11 +151,9 @@ class AIServer:
                 await writer.drain()
 
         except asyncio.IncompleteReadError:
-            now = datetime.now().strftime("%H:%M:%S")
-            print(f"[{now}] 운용서버 연결 종료: {addr}")
+            print(f"[{now()}] 운용서버 연결 종료: {addr}")
         except Exception as e:
-            now = datetime.now().strftime("%H:%M:%S")
-            print(f"[{now}] 오류 발생: {e}")
+            print(f"[{now()}] 오류 발생: {e}")
         finally:
             writer.close()
 
@@ -123,7 +161,7 @@ class AIServer:
         """서버 실행"""
         self.load_model()
         server = await asyncio.start_server(self.handle_client, HOST, PORT)
-        print(f"AI 서버 시작 → {HOST}:{PORT}")
+        print(f"[{now()}] AI 서버 시작 → {HOST}:{PORT}")
         async with server:
             await server.serve_forever()
 

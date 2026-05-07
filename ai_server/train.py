@@ -45,8 +45,9 @@ class SignLanguageDataset(Dataset):
         return len(self.sequences)
 
     def __getitem__(self, idx: int) -> tuple:
-        seq   = torch.tensor(self.sequences[idx], dtype=torch.float32)  # (T, 134)
-        label = torch.tensor(self.labels[idx],    dtype=torch.long)
+        # object array일 경우 float32로 변환
+        seq   = torch.tensor(np.array(self.sequences[idx], dtype=np.float32), dtype=torch.float32)
+        label = torch.tensor(self.labels[idx], dtype=torch.long)
         return seq, label
 
 
