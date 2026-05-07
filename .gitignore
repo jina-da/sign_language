@@ -221,3 +221,4 @@ ai_server/data/processed/
 *.npy
 *.zip
 *.tar
+ai_server/data/
