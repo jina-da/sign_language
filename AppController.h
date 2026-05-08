@@ -5,6 +5,7 @@
 #include "widgets/LoginWidget.h"
 #include "widgets/MainWindow.h"
 #include "widgets/StudyWidget.h"
+#include "widgets/RegisterWidget.h"
 #include "network/TcpClient.h"
 
 class AppController : public QObject
@@ -21,7 +22,11 @@ private slots:
     void onConnectionChanged(bool connected);
 
 private:
-    TcpClient   *m_client;
-    LoginWidget *m_loginWidget;
-    MainWindow  *m_mainWindow;
+    TcpClient      *m_client;
+    LoginWidget    *m_loginWidget;
+    MainWindow     *m_mainWindow;
+    RegisterWidget *m_registerWidget;
+
+    QString m_sessionToken;
+    QString m_lastUsername;
 };

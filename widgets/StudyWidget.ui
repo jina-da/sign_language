@@ -6,88 +6,35 @@
    <rect><x>0</x><y>0</y><width>900</width><height>600</height></rect>
   </property>
   <property name="styleSheet">
-   <string notr="true">
-QWidget#StudyWidget { background: #F0F7EE; }
-
-/* 상단 진도 바 영역 */
+   <string notr="true">QWidget#StudyWidget { background: #F0F7EE; }
 QWidget#headerArea { background: white; border-bottom: 1px solid #C0DD97; }
 QLabel#wordCountLabel { font-size: 13px; color: #5F5E5A; }
 QLabel#wordIndexLabel { font-size: 13px; font-weight: 500; color: #3B6D11; }
-QProgressBar#studyProgress {
-    background: #EAF3DE; border-radius: 4px; border: none;
-}
+QProgressBar#studyProgress { background: #EAF3DE; border-radius: 4px; border: none; }
 QProgressBar#studyProgress::chunk { background: #639922; border-radius: 4px; }
-
-/* 왼쪽: 영상 + 단어 정보 */
-QWidget#videoArea {
-    background: white; border-radius: 14px; border: 1px solid #C0DD97;
-}
-QLabel#videoPlayer {
-    background: #1a1a2e; border-radius: 10px;
-    color: #888780; font-size: 14px;
-}
-QLabel#wordLabel    { font-size: 28px; font-weight: 500; color: #27500A; }
-QLabel#categoryLabel {
-    font-size: 12px; background: #EAF3DE; color: #3B6D11;
-    border-radius: 99px; padding: 2px 10px;
-}
-QPushButton#replayBtn {
-    background: #EAF3DE; color: #3B6D11; border: none;
-    border-radius: 8px; font-size: 13px; padding: 6px 14px;
-}
+QWidget#videoArea { background: white; border-radius: 14px; border: 1px solid #C0DD97; }
+QLabel#videoPlayer { background: #1a1a2e; border-radius: 10px; color: #888780; font-size: 14px; }
+QLabel#wordLabel { font-size: 28px; font-weight: 500; color: #27500A; }
+QPushButton#replayBtn { background: #EAF3DE; color: #3B6D11; border: none; border-radius: 8px; font-size: 13px; padding: 6px 14px; }
 QPushButton#replayBtn:hover { background: #C0DD97; }
-
-/* 속도 조절 버튼 */
-QPushButton#speed025, QPushButton#speed050,
-QPushButton#speed100, QPushButton#speed150, QPushButton#speed200 {
-    background: #F0F7EE; color: #5F5E5A; border: 1px solid #C0DD97;
-    border-radius: 6px; font-size: 12px; padding: 4px 8px;
-}
-QPushButton#speed025:checked, QPushButton#speed050:checked,
-QPushButton#speed100:checked, QPushButton#speed150:checked,
-QPushButton#speed200:checked {
-    background: #3B6D11; color: white; border-color: #3B6D11;
-}
-
-/* 오른쪽: 카메라 + 인식 결과 */
-QWidget#cameraArea {
-    background: white; border-radius: 14px; border: 1px solid #C0DD97;
-}
-QLabel#cameraView {
-    background: #1a1a2e; border-radius: 10px;
-    color: #888780; font-size: 14px;
-}
-
-/* 상태 표시 */
-QLabel#recordingLabel {
-    font-size: 13px; color: #E24B4A; font-weight: 500;
-}
+QPushButton#speed025, QPushButton#speed050, QPushButton#speed100, QPushButton#speed150, QPushButton#speed200 { background: #F0F7EE; color: #5F5E5A; border: 1px solid #C0DD97; border-radius: 6px; font-size: 12px; padding: 4px 8px; }
+QPushButton#speed025:checked, QPushButton#speed050:checked, QPushButton#speed100:checked, QPushButton#speed150:checked, QPushButton#speed200:checked { background: #3B6D11; color: white; border-color: #3B6D11; }
+QWidget#cameraArea { background: white; border-radius: 14px; border: 1px solid #C0DD97; }
+QLabel#cameraView { background: #1a1a2e; border-radius: 10px; color: #888780; font-size: 14px; }
+QLabel#recordingLabel { font-size: 13px; color: #E24B4A; font-weight: 500; }
 QLabel#statusLabel { font-size: 13px; color: #5F5E5A; }
-
-/* 결과 카드 */
-QWidget#resultCard {
-    border-radius: 12px; border: 1px solid #C0DD97;
-}
+QWidget#resultCard { border-radius: 12px; border: 1px solid #C0DD97; }
 QLabel#verdictLabel { font-size: 20px; font-weight: 500; }
 QLabel#confidenceLabel { font-size: 13px; color: #5F5E5A; }
-
-/* 하단 버튼 */
-QPushButton#skipBtn {
-    background: transparent; color: #888780;
-    border: 1px solid #C0DD97; border-radius: 8px;
-    font-size: 13px; padding: 8px 20px;
-}
+QPushButton#prevBtn { background: transparent; color: #5F5E5A; border: 1px solid #C0DD97; border-radius: 8px; font-size: 13px; padding: 8px 20px; }
+QPushButton#prevBtn:hover { background: #F0F7EE; }
+QPushButton#prevBtn:disabled { color: #B4B2A9; border-color: #E0E0E0; }
+QPushButton#skipBtn { background: transparent; color: #888780; border: 1px solid #C0DD97; border-radius: 8px; font-size: 13px; padding: 8px 20px; }
 QPushButton#skipBtn:hover { background: #F0F7EE; }
-QPushButton#nextBtn {
-    background: #3B6D11; color: white; border: none;
-    border-radius: 8px; font-size: 13px;
-    font-weight: 500; padding: 8px 28px;
-}
+QPushButton#nextBtn { background: #3B6D11; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 500; padding: 8px 28px; }
 QPushButton#nextBtn:hover { background: #27500A; }
-QPushButton#nextBtn:disabled { background: #B4B2A9; }
-   </string>
+QPushButton#nextBtn:disabled { background: #B4B2A9; }</string>
   </property>
-
   <layout class="QVBoxLayout" name="rootLayout">
    <property name="spacing"><number>0</number></property>
    <property name="leftMargin"><number>0</number></property>
@@ -95,7 +42,7 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }
    <property name="rightMargin"><number>0</number></property>
    <property name="bottomMargin"><number>0</number></property>
 
-   <!-- 상단 진도 영역 -->
+   <!-- ★ headerArea: 반드시 QWidget 태그로 감싸야 ui->headerArea 접근 가능 -->
    <item>
     <widget class="QWidget" name="headerArea">
      <property name="minimumSize"><size><width>0</width><height>52</height></size></property>
@@ -129,7 +76,6 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }
     </widget>
    </item>
 
-   <!-- 본문: 왼쪽(영상) | 오른쪽(카메라) -->
    <item>
     <layout class="QHBoxLayout" name="bodyLayout">
      <property name="leftMargin"><number>16</number></property>
@@ -138,7 +84,7 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }
      <property name="bottomMargin"><number>16</number></property>
      <property name="spacing"><number>14</number></property>
 
-     <!-- 왼쪽: 영상 + 단어 정보 -->
+     <!-- ★ videoArea: QWidget 태그 유지 -->
      <item>
       <widget class="QWidget" name="videoArea">
        <layout class="QVBoxLayout" name="videoLayout">
@@ -147,8 +93,6 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }
         <property name="rightMargin"><number>16</number></property>
         <property name="bottomMargin"><number>16</number></property>
         <property name="spacing"><number>12</number></property>
-
-        <!-- 영상 플레이어 -->
         <item>
          <widget class="QLabel" name="videoPlayer">
           <property name="text"><string>영상 로딩 중...</string></property>
@@ -156,47 +100,93 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }
           <property name="minimumSize"><size><width>0</width><height>260</height></size></property>
          </widget>
         </item>
-
-        <!-- 단어 + 카테고리 -->
         <item>
-         <layout class="QHBoxLayout" name="wordRow">
-          <property name="spacing"><number>10</number></property>
+         <layout class="QVBoxLayout" name="wordMeaningLayout">
+          <property name="spacing"><number>6</number></property>
           <item>
-           <widget class="QLabel" name="wordLabel">
-            <property name="text"><string>안녕</string></property>
-           </widget>
+           <layout class="QHBoxLayout" name="wordRow">
+            <property name="spacing"><number>10</number></property>
+            <item>
+             <widget class="QLabel" name="wordLabel">
+              <property name="text"><string>안녕</string></property>
+             </widget>
+            </item>
+            <item>
+             <spacer>
+              <property name="orientation"><enum>Qt::Horizontal</enum></property>
+              <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+             </spacer>
+            </item>
+           </layout>
           </item>
           <item>
-           <widget class="QLabel" name="categoryLabel">
-            <property name="text"><string>인사</string></property>
+           <widget class="QLabel" name="meaningLabel">
+            <property name="text"><string>단어의 뜻이 여기에 표시됩니다.</string></property>
+            <property name="wordWrap"><bool>true</bool></property>
+            <property name="styleSheet"><string>font-size:13px; color:#5F5E5A; line-height:1.4;</string></property>
+            <property name="minimumSize"><size><width>0</width><height>40</height></size></property>
            </widget>
-          </item>
-          <item>
-           <spacer><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer>
           </item>
          </layout>
         </item>
-
-        <!-- 속도 조절 -->
         <item>
          <layout class="QHBoxLayout" name="speedRow">
           <property name="spacing"><number>6</number></property>
-          <item><widget class="QLabel"><property name="text"><string>재생 속도:</string></property><property name="styleSheet"><string>font-size:12px; color:#5F5E5A;</string></property></widget></item>
-          <item><widget class="QPushButton" name="speed025"><property name="text"><string>0.25x</string></property><property name="checkable"><bool>true</bool></property></widget></item>
-          <item><widget class="QPushButton" name="speed050"><property name="text"><string>0.5x</string></property><property name="checkable"><bool>true</bool></property></widget></item>
-          <item><widget class="QPushButton" name="speed100"><property name="text"><string>1x</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item>
-          <item><widget class="QPushButton" name="speed150"><property name="text"><string>1.5x</string></property><property name="checkable"><bool>true</bool></property></widget></item>
-          <item><widget class="QPushButton" name="speed200"><property name="text"><string>2x</string></property><property name="checkable"><bool>true</bool></property></widget></item>
-          <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-          <item><widget class="QPushButton" name="replayBtn"><property name="text"><string>↺ 다시 보기</string></property></widget></item>
+          <item>
+           <widget class="QLabel" name="speedLabel">
+            <property name="text"><string>재생 속도:</string></property>
+            <property name="styleSheet"><string>font-size:12px; color:#5F5E5A;</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="speed025">
+            <property name="text"><string>0.25x</string></property>
+            <property name="checkable"><bool>true</bool></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="speed050">
+            <property name="text"><string>0.5x</string></property>
+            <property name="checkable"><bool>true</bool></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="speed100">
+            <property name="text"><string>1x</string></property>
+            <property name="checkable"><bool>true</bool></property>
+            <property name="checked"><bool>true</bool></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="speed150">
+            <property name="text"><string>1.5x</string></property>
+            <property name="checkable"><bool>true</bool></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="speed200">
+            <property name="text"><string>2x</string></property>
+            <property name="checkable"><bool>true</bool></property>
+           </widget>
+          </item>
+          <item>
+           <spacer>
+            <property name="orientation"><enum>Qt::Horizontal</enum></property>
+            <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="replayBtn">
+            <property name="text"><string>↺ 다시 보기</string></property>
+           </widget>
+          </item>
          </layout>
         </item>
-
        </layout>
       </widget>
      </item>
 
-     <!-- 오른쪽: 카메라 + 인식 결과 -->
+     <!-- ★ cameraArea: QWidget 태그 유지 -->
      <item>
       <widget class="QWidget" name="cameraArea">
        <layout class="QVBoxLayout" name="cameraLayout">
@@ -205,8 +195,6 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }
         <property name="rightMargin"><number>16</number></property>
         <property name="bottomMargin"><number>16</number></property>
         <property name="spacing"><number>12</number></property>
-
-        <!-- 카메라 뷰 -->
         <item>
          <widget class="QLabel" name="cameraView">
           <property name="text"><string>카메라 준비 중...</string></property>
@@ -214,8 +202,6 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }
           <property name="minimumSize"><size><width>0</width><height>260</height></size></property>
          </widget>
         </item>
-
-        <!-- 녹화 상태 -->
         <item>
          <layout class="QHBoxLayout" name="statusRow">
           <item>
@@ -229,11 +215,16 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }
             <property name="text"><string>공수 자세를 취하면 자동으로 시작됩니다</string></property>
            </widget>
           </item>
-          <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+          <item>
+           <spacer>
+            <property name="orientation"><enum>Qt::Horizontal</enum></property>
+            <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+           </spacer>
+          </item>
          </layout>
         </item>
 
-        <!-- 인식 결과 카드 (평소 숨김) -->
+        <!-- ★ resultCard: 반드시 QWidget 태그로 감싸야 ui->resultCard->hide()/show() 가능 -->
         <item>
          <widget class="QWidget" name="resultCard">
           <property name="visible"><bool>false</bool></property>
@@ -244,28 +235,66 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }
            <property name="bottomMargin"><number>14</number></property>
            <property name="spacing"><number>6</number></property>
            <item>
-            <layout class="QHBoxLayout">
-             <item><widget class="QLabel" name="verdictLabel"><property name="text"><string>정답!</string></property></widget></item>
-             <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-             <item><widget class="QLabel" name="confidenceLabel"><property name="text"><string>신뢰도: 87.3%</string></property></widget></item>
+            <layout class="QHBoxLayout" name="resultRow">
+             <item>
+              <widget class="QLabel" name="verdictLabel">
+               <property name="text"><string>정답!</string></property>
+              </widget>
+             </item>
+             <item>
+              <spacer>
+               <property name="orientation"><enum>Qt::Horizontal</enum></property>
+               <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="QLabel" name="confidenceLabel">
+               <property name="text"><string>신뢰도: 87.3%</string></property>
+              </widget>
+             </item>
             </layout>
            </item>
           </layout>
          </widget>
         </item>
 
-        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer></item>
-
-        <!-- 하단 버튼 -->
+        <item>
+         <spacer>
+          <property name="orientation"><enum>Qt::Vertical</enum></property>
+          <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
+         </spacer>
+        </item>
         <item>
          <layout class="QHBoxLayout" name="btnRow">
-          <property name="spacing"><number>10</number></property>
-          <item><widget class="QPushButton" name="skipBtn"><property name="text"><string>건너뛰기</string></property><property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property></widget></item>
-          <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-          <item><widget class="QPushButton" name="nextBtn"><property name="text"><string>다음 단어 →</string></property><property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property><property name="enabled"><bool>false</bool></property></widget></item>
+          <property name="spacing"><number>8</number></property>          
+          <item>
+           <widget class="QPushButton" name="skipBtn">
+            <property name="text"><string>건너뛰기</string></property>
+            <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="prevBtn">
+            <property name="text"><string>← 이전 단어</string></property>
+            <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+            <property name="enabled"><bool>false</bool></property>
+           </widget>
+          </item>
+          <item>
+           <spacer>
+            <property name="orientation"><enum>Qt::Horizontal</enum></property>
+            <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="nextBtn">
+            <property name="text"><string>다음 단어 →</string></property>
+            <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+            <property name="enabled"><bool>false</bool></property>
+           </widget>
+          </item>
          </layout>
         </item>
-
        </layout>
       </widget>
      </item>

@@ -7,6 +7,7 @@
 MainWindow::MainWindow(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::MainWindow)
+    , m_kpClient(new KeypointClient(this))
 {
     qDebug() << "[Main] setupUi start";
     ui->setupUi(this);
@@ -15,14 +16,21 @@ MainWindow::MainWindow(QWidget *parent)
     setupNavButtons();
     setupModeCards();
 
-    // 학습 탭(인덱스 1)에 StudyWidget 삽입
+    // 학습 탭에 StudyWidget 삽입
     m_studyWidget = new StudyWidget(this);
     ui->contentStack->removeWidget(ui->studyTab);
     ui->contentStack->insertWidget(1, m_studyWidget);
 
-    switchTab(0);
+    // KeypointClient → StudyWidget 연결
+    connect(m_kpClient, &KeypointClient::frameReady,
+            m_studyWidget, &StudyWidget::onCameraFrame);
+    connect(m_kpClient, &KeypointClient::keypointReady,
+            m_studyWidget, &StudyWidget::onKeypointFrame);
 
-    // 초기 연결 상태 표시
+    // keypoint_server에 연결 시작 (항상 시도, 없으면 재연결 반복)
+    m_kpClient->connectToServer("127.0.0.1");
+
+    switchTab(0);
     setConnected(false);
 
     qDebug() << "[Main] constructor done";
@@ -30,6 +38,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
+    m_kpClient->disconnectFromServer();
     delete ui;
 }
 
@@ -68,7 +77,6 @@ void MainWindow::setupModeCards()
 
 void MainWindow::switchTab(int index)
 {
-    // 활성 탭: 초록 밑줄 + 굵게 / 비활성: 기본
     const QString active = QString(
         "font-size:13px; color:%1; font-weight:500;"
         "border-bottom:2px solid %1; padding:0 14px; background:transparent;"
@@ -76,8 +84,7 @@ void MainWindow::switchTab(int index)
 
     const QString inactive = QString(
         "font-size:13px; color:%1;"
-        "border-bottom:2px solid transparent;"
-        "padding:0 14px; background:transparent;"
+        "border-bottom:2px solid transparent; padding:0 14px; background:transparent;"
     ).arg(AppStyle::C_TEXT_MID);
 
     for (int i = 0; i < m_navBtns.size(); i++)
@@ -85,9 +92,6 @@ void MainWindow::switchTab(int index)
 
     ui->contentStack->setCurrentIndex(index);
 }
-
-// ── 동적 상태 업데이트 ────────────────────────────────────────
-// 아래는 런타임 조건에 따라 바뀌는 스타일이므로 코드로 처리
 
 void MainWindow::setUserInfo(const QString &username, bool)
 {
@@ -98,7 +102,6 @@ void MainWindow::setUserInfo(const QString &username, bool)
 
 void MainWindow::setConnected(bool connected)
 {
-    // connDot, connLabel 색상은 연결 상태에 따라 동적으로 변경
     if (connected) {
         ui->connDot->setStyleSheet(
             QString("background:%1; border-radius:4px;").arg(AppStyle::C_GREEN_LIGHT));

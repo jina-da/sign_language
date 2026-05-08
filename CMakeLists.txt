@@ -28,6 +28,8 @@ qt_add_executable(SignLearnClient
     main.cpp
     AppController.h
     AppController.cpp
+    camera/KeypointClient.h
+    camera/KeypointClient.cpp
     network/ProtocolHandler.h
     network/ProtocolHandler.cpp
     network/TcpClient.h
@@ -36,6 +38,9 @@ qt_add_executable(SignLearnClient
     widgets/LoginWidget.h
     widgets/LoginWidget.cpp
     widgets/LoginWidget.ui
+    widgets/RegisterWidget.h
+    widgets/RegisterWidget.cpp
+    widgets/RegisterWidget.ui
     widgets/StudyWidget.h
     widgets/StudyWidget.cpp
     widgets/StudyWidget.ui
@@ -60,6 +65,7 @@ target_include_directories(SignLearnClient PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/network
     ${CMAKE_CURRENT_SOURCE_DIR}/widgets
+    ${CMAKE_CURRENT_SOURCE_DIR}/camera
 )
 
 qt_finalize_executable(SignLearnClient)

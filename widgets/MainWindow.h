@@ -4,6 +4,7 @@
 #include <QList>
 #include <QPushButton>
 #include "StudyWidget.h"
+#include "camera/KeypointClient.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -22,8 +23,8 @@ public:
     void setTodayProgress(int done, int goal);
     void setReviewCount(int count);
 
-    // StudyWidget 접근 (AppController에서 단어 목록 전달용)
-    StudyWidget* studyWidget() const { return m_studyWidget; }
+    StudyWidget*    studyWidget()    const { return m_studyWidget; }
+    KeypointClient* keypointClient() const { return m_kpClient; }
 
 signals:
     void logoutRequested();
@@ -33,14 +34,14 @@ signals:
     void dictModeRequested();
 
 private:
-    void applyStyles();
-    void switchTab(int index);
     void setupNavButtons();
     void setupModeCards();
+    void switchTab(int index);
 
-    Ui::MainWindow *ui;
+    Ui::MainWindow  *ui;
     QList<QPushButton*> m_navBtns;
-    StudyWidget *m_studyWidget = nullptr;
+    StudyWidget     *m_studyWidget = nullptr;
+    KeypointClient  *m_kpClient    = nullptr;
 
     QString m_username;
     int m_todayDone = 0;

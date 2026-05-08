@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>RegisterWidget</class>
+ <widget class="QWidget" name="RegisterWidget">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1024</width><height>680</height></rect>
+  </property>
+  <property name="windowTitle"><string>수화배움 — 회원가입</string></property>
+  <property name="styleSheet">
+   <string notr="true">
+QWidget#RegisterWidget { background: #F0F7EE; }
+QFrame#regCard { background: white; border-radius: 20px; border: 1px solid #C0DD97; }
+QLabel#titleLabel { font-size: 20px; font-weight: 500; color: #27500A; }
+QLabel#subLabel   { font-size: 13px; color: #639922; }
+QFrame#divider    { background: #EAF3DE; border: none; max-height: 1px; }
+QLabel#errorLabel { color:#A32D2D; background:#FCEBEB; border-radius:8px; padding:8px; font-size:13px; }
+QLabel#fieldLabel { font-size: 13px; color: #5F5E5A; }
+QLineEdit {
+    border: 1px solid #C0DD97; border-radius: 10px;
+    padding: 0 10px; font-size: 14px; color: #27500A;
+    background: #FAFFF8; min-height: 40px; max-height: 40px;
+}
+QLineEdit:focus { border-color: #639922; background: #F3FBED; }
+QRadioButton {
+    font-size: 13px; color: #27500A; spacing: 6px;
+}
+QRadioButton::indicator {
+    width: 16px; height: 16px;
+    border: 1px solid #C0DD97; border-radius: 8px; background: white;
+}
+QRadioButton::indicator:checked {
+    background: #639922; border-color: #639922;
+}
+QCheckBox#consentBox {
+    font-size: 12px; color: #5F5E5A;
+}
+QCheckBox#consentBox::indicator {
+    width: 15px; height: 15px;
+    border: 1px solid #C0DD97; border-radius: 4px; background: white;
+}
+QCheckBox#consentBox::indicator:checked { background: #639922; border-color: #639922; }
+QCheckBox#deafBox {
+    font-size: 13px; color: #27500A;
+}
+QCheckBox#deafBox::indicator {
+    width: 15px; height: 15px;
+    border: 1px solid #C0DD97; border-radius: 4px; background: white;
+}
+QCheckBox#deafBox::indicator:checked { background: #639922; border-color: #639922; }
+QPushButton#registerBtn {
+    background: #3B6D11; color: white; border: none;
+    border-radius: 10px; font-size: 15px; font-weight: 500;
+}
+QPushButton#registerBtn:hover { background: #27500A; }
+QPushButton#registerBtn:disabled { background: #B4B2A9; }
+QPushButton#backBtn {
+    background: transparent; color: #3B6D11;
+    border: 1px solid #97C459; border-radius: 10px; font-size: 14px;
+}
+QPushButton#backBtn:hover { background: #EAF3DE; }
+   </string>
+  </property>
+
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="spacing"><number>0</number></property>
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+
+   <item>
+    <spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>30</height></size></property></spacer>
+   </item>
+
+   <item>
+    <layout class="QHBoxLayout" name="centerRow">
+     <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item>
+      <widget class="QFrame" name="regCard">
+       <property name="minimumWidth"><number>420</number></property>
+       <property name="maximumWidth"><number>420</number></property>
+
+       <layout class="QVBoxLayout" name="cardLayout">
+        <property name="leftMargin"><number>36</number></property>
+        <property name="topMargin"><number>30</number></property>
+        <property name="rightMargin"><number>36</number></property>
+        <property name="bottomMargin"><number>28</number></property>
+        <property name="spacing"><number>0</number></property>
+
+        <!-- 타이틀 -->
+        <item><widget class="QLabel" name="titleLabel"><property name="text"><string>회원가입</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>4</height></size></property></spacer></item>
+        <item><widget class="QLabel" name="subLabel"><property name="text"><string>수화배움 계정을 만들어보세요</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>14</height></size></property></spacer></item>
+        <item><widget class="QFrame" name="divider"><property name="frameShape"><enum>QFrame::HLine</enum></property><property name="frameShadow"><enum>QFrame::Plain</enum></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>14</height></size></property></spacer></item>
+
+        <!-- 오류 레이블 -->
+        <item><widget class="QLabel" name="errorLabel"><property name="text"><string/></property><property name="alignment"><set>Qt::AlignCenter</set></property><property name="wordWrap"><bool>true</bool></property><property name="visible"><bool>false</bool></property></widget></item>
+
+        <!-- 아이디 -->
+        <item><widget class="QLabel" name="fieldLabel"><property name="text"><string>아이디</string></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>4</height></size></property></spacer></item>
+        <item><widget class="QLineEdit" name="usernameEdit"><property name="placeholderText"><string>아이디 입력 (4자 이상)</string></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+
+        <!-- 비밀번호 -->
+        <item><widget class="QLabel"><property name="text"><string>비밀번호</string></property><property name="styleSheet"><string>font-size:13px; color:#5F5E5A;</string></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>4</height></size></property></spacer></item>
+        <item><widget class="QLineEdit" name="passwordEdit"><property name="placeholderText"><string>비밀번호 입력 (6자 이상)</string></property><property name="echoMode"><enum>QLineEdit::Password</enum></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+
+        <!-- 비밀번호 확인 -->
+        <item><widget class="QLabel"><property name="text"><string>비밀번호 확인</string></property><property name="styleSheet"><string>font-size:13px; color:#5F5E5A;</string></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>4</height></size></property></spacer></item>
+        <item><widget class="QLineEdit" name="passwordConfirmEdit"><property name="placeholderText"><string>비밀번호 재입력</string></property><property name="echoMode"><enum>QLineEdit::Password</enum></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>12</height></size></property></spacer></item>
+
+        <!-- 우세손 -->
+        <item><widget class="QLabel"><property name="text"><string>우세손 (주로 사용하는 손)</string></property><property name="styleSheet"><string>font-size:13px; color:#5F5E5A;</string></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>6</height></size></property></spacer></item>
+        <item>
+         <layout class="QHBoxLayout" name="handRow">
+          <property name="spacing"><number>20</number></property>
+          <item><widget class="QRadioButton" name="rightHandBtn"><property name="text"><string>오른손 (기본)</string></property><property name="checked"><bool>true</bool></property></widget></item>
+          <item><widget class="QRadioButton" name="leftHandBtn"><property name="text"><string>왼손</string></property></widget></item>
+          <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+         </layout>
+        </item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>12</height></size></property></spacer></item>
+
+        <!-- 농인 여부 -->
+        <item><widget class="QCheckBox" name="deafBox"><property name="text"><string>농인입니다 (수화는 알지만 한글 단어가 낯선 경우)</string></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>12</height></size></property></spacer></item>
+
+        <!-- 키포인트 수집 동의 -->
+        <item><widget class="QCheckBox" name="consentBox"><property name="text"><string>키포인트 데이터 수집 및 AI 학습 활용에 동의합니다 (선택)</string></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>16</height></size></property></spacer></item>
+
+        <!-- 버튼 -->
+        <item><widget class="QPushButton" name="registerBtn"><property name="text"><string>회원가입</string></property><property name="minimumSize"><size><width>0</width><height>42</height></size></property><property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property></widget></item>
+        <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+        <item><widget class="QPushButton" name="backBtn"><property name="text"><string>← 로그인으로 돌아가기</string></property><property name="minimumSize"><size><width>0</width><height>38</height></size></property><property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property></widget></item>
+
+       </layout>
+      </widget>
+     </item>
+     <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+    </layout>
+   </item>
+
+   <item>
+    <spacer><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>30</height></size></property></spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
