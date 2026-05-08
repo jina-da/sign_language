@@ -216,3 +216,50 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ─────────────────────────────────────────────
+# C++ / Qt 빌드 산출물
+# ─────────────────────────────────────────────
+
+# CMake 빌드 디렉터리
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Qt 자동 생성 파일 (빌드 시 재생성됨)
+*_autogen/
+moc_*.cpp
+moc_*.h
+ui_*.h
+qrc_*.cpp
+*.pro.user
+*.pro.user.*
+
+# 컴파일 산출물
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.exe
+*.out
+
+# Qt Creator 프로젝트 설정 (로컬 전용)
+*.user
+*.creator.user
+.qmake.stash
+
+# Visual Studio / CLion 설정
+.vs/
+.idea/
+*.vcxproj.user
+
+# ─────────────────────────────────────────────
+# MediaPipe 모델 파일
+# 최초 실행 시 keypoint_server.py 가 자동 다운로드함
+# ─────────────────────────────────────────────
+keypoint_server/*.task
