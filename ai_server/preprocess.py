@@ -12,9 +12,9 @@ import numpy as np
 from pathlib import Path
 
 # ── 경로 설정 ──────────────────────────────────────────
-BASE_DIR     = Path("data/raw/004.수어영상/1.Training/라벨링데이터/REAL/WORD")
-MORPHEME_DIR = BASE_DIR / "morpheme"
-SYN_CSV = Path("data/syn_단어목록.csv")
+BASE_DIR     = Path("data/raw/WORD/004.수어영상/1.Training/라벨링데이터/REAL/WORD")
+MORPHEME_DIR = Path("data/raw/WORD/morpheme")
+SYN_CSV      = Path("data/syn_단어목록.csv")
 OUTPUT_DIR   = Path("data/processed")
 
 # ── 상수 ───────────────────────────────────────────────
