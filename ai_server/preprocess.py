@@ -88,7 +88,12 @@ def process_sample(word_num: str, person: str) -> np.ndarray | None:
     if len(frames) == 0:
         return None
 
+     # 최소 5프레임 이상인 샘플만 사용
+    if len(frames) < 5:
+        return None
+
     return np.array(frames, dtype=np.float32)  # (T, 134)
+
 
 
 def main():

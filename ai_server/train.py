@@ -1,7 +1,7 @@
 """
 학습 스크립트
-- 전처리된 데이터 로드 (sequences.npy, label_indices.npy)
-- 8:1:1 비율로 train/val/test 분리
+- 원본 데이터 기준으로 train/val/test 분리 후 train만 증강
+- 데이터 누수 방지 (같은 원본에서 나온 증강 데이터가 val/test에 섞이지 않게)
 - Transformer 모델 학습
 - epoch마다 val accuracy 확인
 - 가장 좋은 모델 저장
@@ -10,13 +10,13 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from pathlib import Path
+from scipy.interpolate import interp1d
 import time
 
-from model import build_model
-
+from model import build_model, build_gru_model
 
 # ── 경로 설정 ──────────────────────────────────────────
 DATA_DIR   = Path("data/processed")
@@ -25,49 +25,76 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── 하이퍼파라미터 ─────────────────────────────────────
 BATCH_SIZE  = 32
-NUM_EPOCHS  = 50
-LR          = 1e-4       # Adam optimizer 초기 학습률
+NUM_EPOCHS  = 100
+LR          = 1e-4
 NUM_CLASSES = 1000
 DEVICE      = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+# ── 증강 함수 ──────────────────────────────────────────
+def add_noise(seq: np.ndarray, std: float) -> np.ndarray:
+    """좌표에 가우시안 노이즈 추가"""
+    noise = np.random.normal(0, std, seq.shape).astype(np.float32)
+    return np.clip(seq + noise, 0.0, 1.0)
+
+
+def time_warp(seq: np.ndarray, speed: float) -> np.ndarray:
+    """시퀀스 속도 변환"""
+    T = seq.shape[0]
+    new_T = max(5, int(T / speed))
+    old_idx = np.linspace(0, T - 1, T)
+    new_idx = np.linspace(0, T - 1, new_T)
+    warped = np.zeros((new_T, seq.shape[1]), dtype=np.float32)
+    for dim in range(seq.shape[1]):
+        f = interp1d(old_idx, seq[:, dim], kind='linear')
+        warped[:, dim] = f(new_idx)
+    if np.isnan(warped).any():
+        return seq
+    return warped
+
+
+def augment_sequences(sequences: np.ndarray, labels: np.ndarray) -> tuple:
+    """train 데이터만 증강 (×5배)"""
+    aug_seqs   = []
+    aug_labels = []
+    for seq, label in zip(sequences, labels):
+        aug_seqs.append(seq)
+        aug_labels.append(label)
+        aug_seqs.append(add_noise(seq, std=0.01))
+        aug_labels.append(label)
+        aug_seqs.append(add_noise(seq, std=0.02))
+        aug_labels.append(label)
+        aug_seqs.append(time_warp(seq, speed=1.25))
+        aug_labels.append(label)
+        aug_seqs.append(time_warp(seq, speed=0.75))
+        aug_labels.append(label)
+    return np.array(aug_seqs, dtype=object), np.array(aug_labels, dtype=np.int32)
+
+
 class SignLanguageDataset(Dataset):
-    """
-    수화 keypoint 시퀀스 데이터셋
-    가변 길이 시퀀스를 처리하기 위해 길이 정보도 저장
-    """
+    """수화 keypoint 시퀀스 데이터셋"""
 
     def __init__(self, sequences: np.ndarray, labels: np.ndarray):
-        self.sequences = sequences  # (N,) object array, 각 원소: (T, 134)
-        self.labels    = labels     # (N,) int32
+        self.sequences = sequences
+        self.labels    = labels
 
     def __len__(self) -> int:
         return len(self.sequences)
 
     def __getitem__(self, idx: int) -> tuple:
-        # object array일 경우 float32로 변환
         seq   = torch.tensor(np.array(self.sequences[idx], dtype=np.float32), dtype=torch.float32)
         label = torch.tensor(self.labels[idx], dtype=torch.long)
         return seq, label
 
 
 def collate_fn(batch: list) -> tuple:
-    """
-    가변 길이 시퀀스를 배치로 묶는 함수
-    짧은 시퀀스는 0으로 패딩, padding_mask로 패딩 위치 표시
-    """
+    """가변 길이 시퀀스를 배치로 묶는 함수"""
     seqs, labels = zip(*batch)
-
-    # 패딩: 가장 긴 시퀀스 기준으로 0 채우기
-    # pad_sequence: (T, 134) → (max_T, batch, 134) → transpose → (batch, max_T, 134)
-    padded = pad_sequence(seqs, batch_first=True, padding_value=0.0)  # (batch, max_T, 134)
-
-    # padding_mask: 패딩된 위치 True (Transformer에서 무시됨)
+    padded = pad_sequence(seqs, batch_first=True, padding_value=0.0)
     lengths = torch.tensor([s.shape[0] for s in seqs])
     max_len = padded.shape[1]
-    padding_mask = torch.arange(max_len).unsqueeze(0) >= lengths.unsqueeze(1)  # (batch, max_T)
-
-    labels = torch.stack(labels)  # (batch,)
+    padding_mask = torch.arange(max_len).unsqueeze(0) >= lengths.unsqueeze(1)
+    labels = torch.stack(labels)
     return padded, labels, padding_mask
 
 
@@ -77,10 +104,7 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     criterion: nn.Module
 ) -> tuple[float, float]:
-    """
-    1 epoch 학습
-    반환: (평균 loss, accuracy)
-    """
+    """1 epoch 학습"""
     model.train()
     total_loss = 0.0
     correct    = 0
@@ -92,9 +116,11 @@ def train_one_epoch(
         padding_mask = padding_mask.to(DEVICE)
 
         optimizer.zero_grad()
-        outputs = model(seqs, padding_mask)          # (batch, 1000)
+        outputs = model(seqs, padding_mask)
         loss    = criterion(outputs, labels)
         loss.backward()
+        # gradient exploding 방지
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
         total_loss += loss.item()
@@ -111,10 +137,7 @@ def evaluate(
     loader: DataLoader,
     criterion: nn.Module
 ) -> tuple[float, float]:
-    """
-    검증/테스트 평가
-    반환: (평균 loss, accuracy)
-    """
+    """검증/테스트 평가"""
     model.eval()
     total_loss = 0.0
     correct    = 0
@@ -139,35 +162,47 @@ def evaluate(
 def main():
     print(f"device: {DEVICE}")
 
-    # ── 데이터 로드 ────────────────────────────────────
-    sequences = np.load(DATA_DIR / "sequences_aug.npy",     allow_pickle=True)
-    labels    = np.load(DATA_DIR / "label_indices_aug.npy")
-    print(f"총 샘플 수: {len(sequences)}")
+    # ── 원본 데이터 로드 ───────────────────────────────
+    sequences = np.load(DATA_DIR / "sequences.npy",     allow_pickle=True)
+    labels    = np.load(DATA_DIR / "label_indices.npy")
+    print(f"원본 샘플 수: {len(sequences)}")
 
-    # ── 데이터셋 분리 8:1:1 ────────────────────────────
-    dataset    = SignLanguageDataset(sequences, labels)
-    total      = len(dataset)
-    train_size = int(total * 0.8)
-    val_size   = int(total * 0.1)
-    test_size  = total - train_size - val_size
+    # ── 원본 기준으로 8:1:1 분리 ──────────────────────
+    total      = len(sequences)
+    indices    = np.random.default_rng(42).permutation(total)
+    train_end  = int(total * 0.8)
+    val_end    = int(total * 0.9)
 
-    train_set, val_set, test_set = random_split(
-        dataset, [train_size, val_size, test_size],
-        generator=torch.Generator().manual_seed(42)  # 재현성
-    )
-    print(f"train: {train_size} | val: {val_size} | test: {test_size}")
+    train_idx = indices[:train_end]
+    val_idx   = indices[train_end:val_end]
+    test_idx  = indices[val_end:]
+
+    train_seqs   = sequences[train_idx]
+    train_labels = labels[train_idx]
+    val_seqs     = sequences[val_idx]
+    val_labels   = labels[val_idx]
+    test_seqs    = sequences[test_idx]
+    test_labels  = labels[test_idx]
+
+    # ── train만 증강 ───────────────────────────────────
+    # print("train 데이터 증강 중...")
+    # train_seqs, train_labels = augment_sequences(train_seqs, train_labels)
+    # print(f"train: {len(train_seqs)} | val: {len(val_seqs)} | test: {len(test_seqs)}")
 
     # ── DataLoader ─────────────────────────────────────
-    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True,  collate_fn=collate_fn)
-    val_loader   = DataLoader(val_set,   batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_fn)
-    test_loader  = DataLoader(test_set,  batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_fn)
+    train_loader = DataLoader(SignLanguageDataset(train_seqs, train_labels),
+                              batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_fn)
+    val_loader   = DataLoader(SignLanguageDataset(val_seqs, val_labels),
+                              batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_fn)
+    test_loader  = DataLoader(SignLanguageDataset(test_seqs, test_labels),
+                              batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_fn)
 
     # ── 모델, 옵티마이저, 손실함수 ─────────────────────
-    model     = build_model(NUM_CLASSES).to(DEVICE)
+    model = build_gru_model(NUM_CLASSES).to(DEVICE)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     criterion = nn.CrossEntropyLoss()
 
-    # 학습률 스케줄러: val loss 개선 없으면 lr 줄이기
+    # 학습률 스케줄러
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', patience=5, factor=0.5
     )
@@ -190,7 +225,6 @@ def main():
             f"{elapsed:.1f}s"
         )
 
-        # 가장 좋은 모델 저장
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             torch.save({
