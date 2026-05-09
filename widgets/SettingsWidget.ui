@@ -1,0 +1,497 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SettingsWidget</class>
+ <widget class="QWidget" name="SettingsWidget">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>900</width><height>600</height></rect>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QWidget#SettingsWidget { background: #F0F7EE; }
+QWidget#headerArea { background: white; border-bottom: 1px solid #C0DD97; }
+QLabel#headerLabel { font-size: 14px; font-weight: 500; color: #27500A; }
+QScrollArea#scrollArea { background: #F0F7EE; border: none; }
+QWidget#scrollContent { background: #F0F7EE; }
+QWidget#sectionCard { background: white; border-radius: 14px; border: 1px solid #C0DD97; }
+QLabel#sectionTitle { font-size: 13px; font-weight: 500; color: #3B6D11; }
+QLabel#itemLabel { font-size: 13px; color: #27500A; }
+QLabel#itemDesc { font-size: 11px; color: #888780; }
+QLabel#statusLabel { font-size: 12px; color: #639922; }
+QSpinBox#goalSpinBox {
+    border: 1px solid #C0DD97; border-radius: 8px;
+    padding: 4px 8px; font-size: 13px; color: #27500A;
+    background: #FAFFF8; min-width: 70px; max-width: 70px;
+}
+QSpinBox#goalSpinBox:focus { border-color: #639922; }
+QRadioButton { font-size: 13px; color: #27500A; }
+QRadioButton::indicator { width: 16px; height: 16px; }
+QCheckBox { font-size: 13px; color: #27500A; }
+QCheckBox::indicator { width: 16px; height: 16px; }
+QLineEdit#pwEdit {
+    border: 1px solid #C0DD97; border-radius: 8px;
+    padding: 6px 12px; font-size: 13px; color: #27500A;
+    background: #FAFFF8; min-width: 200px; max-width: 200px;
+}
+QLineEdit#pwEdit:focus { border-color: #639922; }
+QPushButton#saveBtn {
+    background: #3B6D11; color: white; border: none;
+    border-radius: 8px; font-size: 13px; font-weight: 500;
+    padding: 9px 28px;
+}
+QPushButton#saveBtn:hover { background: #27500A; }
+QPushButton#saveBtn:disabled { background: #B4B2A9; }
+QPushButton#withdrawBtn {
+    background: transparent; color: #A93226;
+    border: 1px solid #F1948A; border-radius: 8px;
+    font-size: 13px; padding: 8px 20px;
+}
+QPushButton#withdrawBtn:hover { background: #FDEDEC; }
+QFrame#divider { background: #EAF3DE; max-height: 1px; min-height: 1px; }</string>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="spacing"><number>0</number></property>
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+    <widget class="QWidget" name="headerArea">
+     <property name="minimumSize"><size><width>0</width><height>52</height></size></property>
+     <property name="maximumSize"><size><width>16777215</width><height>52</height></size></property>
+     <layout class="QHBoxLayout" name="headerLayout">
+      <property name="leftMargin"><number>20</number></property>
+      <property name="rightMargin"><number>20</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+      <property name="spacing"><number>12</number></property>
+      <item>
+       <widget class="QLabel" name="headerLabel">
+        <property name="text"><string>개인 설정</string></property>
+       </widget>
+      </item>
+      <item>
+       <spacer>
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="statusLabel">
+        <property name="text"><string></string></property>
+        <property name="visible"><bool>false</bool></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="widgetResizable"><bool>true</bool></property>
+     <widget class="QWidget" name="scrollContent">
+      <layout class="QVBoxLayout" name="scrollLayout">
+       <property name="leftMargin"><number>24</number></property>
+       <property name="topMargin"><number>20</number></property>
+       <property name="rightMargin"><number>24</number></property>
+       <property name="bottomMargin"><number>24</number></property>
+       <property name="spacing"><number>16</number></property>
+
+       <!-- 섹션 1: 학습 설정 -->
+       <item>
+        <widget class="QWidget" name="sectionCard">
+         <layout class="QVBoxLayout" name="section1Layout">
+          <property name="leftMargin"><number>20</number></property>
+          <property name="topMargin"><number>16</number></property>
+          <property name="rightMargin"><number>20</number></property>
+          <property name="bottomMargin"><number>16</number></property>
+          <property name="spacing"><number>14</number></property>
+          <item>
+           <widget class="QLabel" name="sectionTitle">
+            <property name="text"><string>학습 설정</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QFrame" name="divider1">
+            <property name="frameShape"><enum>QFrame::HLine</enum></property>
+           </widget>
+          </item>
+          <!-- 하루 목표 단어 수 -->
+          <item>
+           <layout class="QHBoxLayout" name="goalRow">
+            <property name="spacing"><number>12</number></property>
+            <item>
+             <layout class="QVBoxLayout" name="goalLabelCol">
+              <property name="spacing"><number>2</number></property>
+              <item>
+               <widget class="QLabel" name="itemLabel">
+                <property name="text"><string>하루 목표 단어 수</string></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="goalDesc">
+                <property name="text"><string>5 ~ 30 사이의 숫자를 입력하세요</string></property>
+                <property name="styleSheet"><string>font-size:11px; color:#888780;</string></property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <spacer>
+              <property name="orientation"><enum>Qt::Horizontal</enum></property>
+              <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="goalSpinBox">
+              <property name="minimum"><number>5</number></property>
+              <property name="maximum"><number>30</number></property>
+              <property name="value"><number>15</number></property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+
+       <!-- 섹션 2: 프로필 설정 -->
+       <item>
+        <widget class="QWidget" name="sectionCard2">
+         <property name="styleSheet"><string>QWidget#sectionCard2 { background: white; border-radius: 14px; border: 1px solid #C0DD97; }</string></property>
+         <layout class="QVBoxLayout" name="section2Layout">
+          <property name="leftMargin"><number>20</number></property>
+          <property name="topMargin"><number>16</number></property>
+          <property name="rightMargin"><number>20</number></property>
+          <property name="bottomMargin"><number>16</number></property>
+          <property name="spacing"><number>14</number></property>
+          <item>
+           <widget class="QLabel" name="sectionTitle2">
+            <property name="text"><string>프로필 설정</string></property>
+            <property name="styleSheet"><string>font-size: 13px; font-weight: 500; color: #3B6D11;</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QFrame" name="divider2">
+            <property name="frameShape"><enum>QFrame::HLine</enum></property>
+           </widget>
+          </item>
+          <!-- 우세손 -->
+          <item>
+           <layout class="QHBoxLayout" name="handRow">
+            <property name="spacing"><number>12</number></property>
+            <item>
+             <layout class="QVBoxLayout" name="handLabelCol">
+              <property name="spacing"><number>2</number></property>
+              <item>
+               <widget class="QLabel" name="handLabel">
+                <property name="text"><string>우세손</string></property>
+                <property name="styleSheet"><string>font-size:13px; color:#27500A;</string></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="handDesc">
+                <property name="text"><string>수화 입력 시 기준이 되는 손</string></property>
+                <property name="styleSheet"><string>font-size:11px; color:#888780;</string></property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <spacer>
+              <property name="orientation"><enum>Qt::Horizontal</enum></property>
+              <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="rightHandBtn">
+              <property name="text"><string>오른손</string></property>
+              <property name="checked"><bool>true</bool></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="leftHandBtn">
+              <property name="text"><string>왼손</string></property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QFrame" name="divider3">
+            <property name="frameShape"><enum>QFrame::HLine</enum></property>
+           </widget>
+          </item>
+          <!-- 농인 여부 -->
+          <item>
+           <layout class="QHBoxLayout" name="deafRow">
+            <property name="spacing"><number>12</number></property>
+            <item>
+             <layout class="QVBoxLayout" name="deafLabelCol">
+              <property name="spacing"><number>2</number></property>
+              <item>
+               <widget class="QLabel" name="deafLabel">
+                <property name="text"><string>농인 여부</string></property>
+                <property name="styleSheet"><string>font-size:13px; color:#27500A;</string></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="deafDesc">
+                <property name="text"><string>체크 시 농인 맞춤 UI가 적용됩니다</string></property>
+                <property name="styleSheet"><string>font-size:11px; color:#888780;</string></property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <spacer>
+              <property name="orientation"><enum>Qt::Horizontal</enum></property>
+              <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="deafCheckBox">
+              <property name="text"><string></string></property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QFrame" name="divider4">
+            <property name="frameShape"><enum>QFrame::HLine</enum></property>
+           </widget>
+          </item>
+          <!-- 키포인트 수집 동의 -->
+          <item>
+           <layout class="QHBoxLayout" name="consentRow">
+            <property name="spacing"><number>12</number></property>
+            <item>
+             <layout class="QVBoxLayout" name="consentLabelCol">
+              <property name="spacing"><number>2</number></property>
+              <item>
+               <widget class="QLabel" name="consentLabel">
+                <property name="text"><string>키포인트 수집 동의</string></property>
+                <property name="styleSheet"><string>font-size:13px; color:#27500A;</string></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="consentDesc">
+                <property name="text"><string>수화 인식 모델 개선을 위한 데이터 수집에 동의합니다</string></property>
+                <property name="styleSheet"><string>font-size:11px; color:#888780;</string></property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <spacer>
+              <property name="orientation"><enum>Qt::Horizontal</enum></property>
+              <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="consentCheckBox">
+              <property name="text"><string></string></property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+
+       <!-- 섹션 3: 비밀번호 변경 -->
+       <item>
+        <widget class="QWidget" name="sectionCard3">
+         <property name="styleSheet"><string>QWidget#sectionCard3 { background: white; border-radius: 14px; border: 1px solid #C0DD97; }</string></property>
+         <layout class="QVBoxLayout" name="section3Layout">
+          <property name="leftMargin"><number>20</number></property>
+          <property name="topMargin"><number>16</number></property>
+          <property name="rightMargin"><number>20</number></property>
+          <property name="bottomMargin"><number>16</number></property>
+          <property name="spacing"><number>14</number></property>
+          <item>
+           <widget class="QLabel" name="sectionTitle3">
+            <property name="text"><string>비밀번호 변경</string></property>
+            <property name="styleSheet"><string>font-size: 13px; font-weight: 500; color: #3B6D11;</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QFrame" name="divider5">
+            <property name="frameShape"><enum>QFrame::HLine</enum></property>
+           </widget>
+          </item>
+          <!-- 현재 비밀번호 -->
+          <item>
+           <layout class="QHBoxLayout" name="curPwRow">
+            <property name="spacing"><number>12</number></property>
+            <item>
+             <widget class="QLabel" name="curPwLabel">
+              <property name="text"><string>현재 비밀번호</string></property>
+              <property name="styleSheet"><string>font-size:13px; color:#27500A; min-width:100px;</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="curPwEdit">
+              <property name="objectName"><string>pwEdit</string></property>
+              <property name="echoMode"><enum>QLineEdit::Password</enum></property>
+              <property name="placeholderText"><string>현재 비밀번호 입력</string></property>
+             </widget>
+            </item>
+            <item>
+             <spacer>
+              <property name="orientation"><enum>Qt::Horizontal</enum></property>
+              <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <!-- 새 비밀번호 -->
+          <item>
+           <layout class="QHBoxLayout" name="newPwRow">
+            <property name="spacing"><number>12</number></property>
+            <item>
+             <widget class="QLabel" name="newPwLabel">
+              <property name="text"><string>새 비밀번호</string></property>
+              <property name="styleSheet"><string>font-size:13px; color:#27500A; min-width:100px;</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="newPwEdit">
+              <property name="objectName"><string>pwEdit</string></property>
+              <property name="echoMode"><enum>QLineEdit::Password</enum></property>
+              <property name="placeholderText"><string>새 비밀번호 (6자 이상)</string></property>
+             </widget>
+            </item>
+            <item>
+             <spacer>
+              <property name="orientation"><enum>Qt::Horizontal</enum></property>
+              <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <!-- 새 비밀번호 확인 -->
+          <item>
+           <layout class="QHBoxLayout" name="confirmPwRow">
+            <property name="spacing"><number>12</number></property>
+            <item>
+             <widget class="QLabel" name="confirmPwLabel">
+              <property name="text"><string>비밀번호 확인</string></property>
+              <property name="styleSheet"><string>font-size:13px; color:#27500A; min-width:100px;</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="confirmPwEdit">
+              <property name="objectName"><string>pwEdit</string></property>
+              <property name="echoMode"><enum>QLineEdit::Password</enum></property>
+              <property name="placeholderText"><string>새 비밀번호 재입력</string></property>
+             </widget>
+            </item>
+            <item>
+             <spacer>
+              <property name="orientation"><enum>Qt::Horizontal</enum></property>
+              <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QLabel" name="pwErrorLabel">
+            <property name="text"><string></string></property>
+            <property name="visible"><bool>false</bool></property>
+            <property name="styleSheet"><string>font-size:12px; color:#A93226;</string></property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+
+       <!-- 저장 버튼 -->
+       <item>
+        <layout class="QHBoxLayout" name="saveBtnRow">
+         <property name="spacing"><number>12</number></property>
+         <item>
+          <spacer>
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+           <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="saveBtn">
+           <property name="text"><string>저장</string></property>
+           <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+
+       <!-- 섹션 4: 계정 관리 -->
+       <item>
+        <widget class="QWidget" name="sectionCard4">
+         <property name="styleSheet"><string>QWidget#sectionCard4 { background: white; border-radius: 14px; border: 1px solid #F1948A; }</string></property>
+         <layout class="QVBoxLayout" name="section4Layout">
+          <property name="leftMargin"><number>20</number></property>
+          <property name="topMargin"><number>16</number></property>
+          <property name="rightMargin"><number>20</number></property>
+          <property name="bottomMargin"><number>16</number></property>
+          <property name="spacing"><number>14</number></property>
+          <item>
+           <widget class="QLabel" name="sectionTitle4">
+            <property name="text"><string>계정 관리</string></property>
+            <property name="styleSheet"><string>font-size: 13px; font-weight: 500; color: #A93226;</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QFrame" name="divider6">
+            <property name="frameShape"><enum>QFrame::HLine</enum></property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="withdrawRow">
+            <property name="spacing"><number>12</number></property>
+            <item>
+             <layout class="QVBoxLayout" name="withdrawLabelCol">
+              <property name="spacing"><number>2</number></property>
+              <item>
+               <widget class="QLabel" name="withdrawLabel">
+                <property name="text"><string>회원 탈퇴</string></property>
+                <property name="styleSheet"><string>font-size:13px; color:#A93226;</string></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="withdrawDesc">
+                <property name="text"><string>탈퇴 시 모든 데이터가 삭제됩니다 (복구 불가)</string></property>
+                <property name="styleSheet"><string>font-size:11px; color:#888780;</string></property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <spacer>
+              <property name="orientation"><enum>Qt::Horizontal</enum></property>
+              <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QPushButton" name="withdrawBtn">
+              <property name="text"><string>회원 탈퇴</string></property>
+              <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+
+       <item>
+        <spacer>
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

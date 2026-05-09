@@ -15,7 +15,7 @@ QWidget#MainWindow { background: #F0F7EE; }
 QWidget#topBar { background: #3B6D11; }
 QLabel#logoIcon { font-size: 20px; }
 QLabel#logoText { font-size: 16px; font-weight: 500; color: #C0DD97; }
-QLabel#userLabel { font-size: 13px; color: #EAF3DE; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 4px 10px; }
+QPushButton#userBtn { font-size: 13px; color: #EAF3DE; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 4px 10px; border: none; } QPushButton#userBtn:hover { background: rgba(255,255,255,0.25); }
 
 /* NavBar */
 QWidget#navBar { background: white; border-bottom: 1px solid #C0DD97; }
@@ -87,7 +87,7 @@ QLabel#phGame,  QLabel#phSettings { font-size: 16px; color: #888780; }
    <property name="rightMargin"><number>0</number></property>
    <property name="bottomMargin"><number>0</number></property>
 
-   <!-- TopBar -->
+   
    <item>
     <widget class="QWidget" name="topBar">
      <property name="minimumSize"><size><width>0</width><height>52</height></size></property>
@@ -109,12 +109,18 @@ QLabel#phGame,  QLabel#phSettings { font-size: 16px; color: #888780; }
        </widget>
       </item>
       <item><widget class="QLabel" name="connLabel"><property name="text"><string>서버 연결됨</string></property></widget></item>
-      <item><widget class="QLabel" name="userLabel"><property name="text"><string>👤  user001</string></property></widget></item>
+      <item>
+       <widget class="QPushButton" name="userBtn">
+        <property name="text"><string>👤  user001</string></property>
+        <property name="flat"><bool>true</bool></property>
+        <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>
 
-   <!-- NavBar -->
+   
    <item>
     <widget class="QWidget" name="navBar">
      <property name="minimumSize"><size><width>0</width><height>44</height></size></property>
@@ -136,11 +142,11 @@ QLabel#phGame,  QLabel#phSettings { font-size: 16px; color: #888780; }
     </widget>
    </item>
 
-   <!-- 콘텐츠 스택 -->
+   
    <item>
     <widget class="QStackedWidget" name="contentStack">
 
-     <!-- 탭0: 홈 -->
+     
      <widget class="QScrollArea" name="homeTab">
       <property name="widgetResizable"><bool>true</bool></property>
       <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
@@ -152,7 +158,7 @@ QLabel#phGame,  QLabel#phSettings { font-size: 16px; color: #888780; }
         <property name="bottomMargin"><number>24</number></property>
         <property name="spacing"><number>14</number></property>
 
-        <!-- 인사 배너 -->
+        
         <item>
          <widget class="QWidget" name="helloBanner">
           <property name="minimumSize"><size><width>0</width><height>80</height></size></property>
@@ -189,7 +195,7 @@ QLabel#phGame,  QLabel#phSettings { font-size: 16px; color: #888780; }
          </widget>
         </item>
 
-        <!-- 진도 카드 -->
+        
         <item>
          <widget class="QWidget" name="progressCard">
           <layout class="QVBoxLayout" name="progressCardLayout">
@@ -213,7 +219,7 @@ QLabel#phGame,  QLabel#phSettings { font-size: 16px; color: #888780; }
          </widget>
         </item>
 
-        <!-- 모드 카드 2x2 -->
+        
         <item>
          <layout class="QGridLayout" name="modeGrid">
           <property name="spacing"><number>10</number></property>
@@ -276,7 +282,7 @@ QLabel#phGame,  QLabel#phSettings { font-size: 16px; color: #888780; }
          </layout>
         </item>
 
-        <!-- 단어 카드 -->
+        
         <item>
          <widget class="QWidget" name="wordCard">
           <layout class="QVBoxLayout" name="wordCardLayout">
@@ -295,7 +301,7 @@ QLabel#phGame,  QLabel#phSettings { font-size: 16px; color: #888780; }
       </widget>
      </widget>
 
-     <!-- 탭1~5: placeholder -->
+     
      <widget class="QWidget" name="studyTab"><layout class="QVBoxLayout"><item><widget class="QLabel" name="phStudy"><property name="text"><string>[ 학습 모드 ] — 이후 단계에서 구현 예정</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item></layout></widget>
      <widget class="QWidget" name="reviewTab"><layout class="QVBoxLayout"><item><widget class="QLabel" name="phReview"><property name="text"><string>[ 복습 모드 ] — 이후 단계에서 구현 예정</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item></layout></widget>
      <widget class="QWidget" name="dictTab"><layout class="QVBoxLayout"><item><widget class="QLabel" name="phDict"><property name="text"><string>[ 수화 사전 ] — 이후 단계에서 구현 예정</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item></layout></widget>

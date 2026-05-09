@@ -8,15 +8,29 @@
 #include <QJsonObject>
 #include <QImage>
 
+// ReviewWidget은 StudyWidget과 동일한 .ui 파일을 공유한다.
+// uic가 생성하는 클래스명이 Ui::StudyWidget 이므로
+// namespace를 StudyWidget으로 선언한다.
 QT_BEGIN_NAMESPACE
 namespace Ui { class StudyWidget; }
 QT_END_NAMESPACE
 
-class StudyWidget : public QWidget
+/**
+ * ReviewWidget — 복습 모드 화면
+ *
+ * StudyWidget과 UI 구조가 동일하여 StudyWidget.ui를 재사용한다.
+ * 학습 모드와의 차이점:
+ *   - 헤더 "복습 모드" 표시
+ *   - 완료 시 nextBtn → "완료" (테스트 없음)
+ *   - testRequested 시그널 없음
+ *   - reviewFinished 시그널 emit
+ */
+class ReviewWidget : public QWidget
 {
     Q_OBJECT
 
 public:
+    // StudyWidget::WordInfo와 동일한 구조 (별도 정의로 의존성 분리)
     struct WordInfo {
         int     id;
         QString word;
@@ -24,11 +38,12 @@ public:
         int     difficulty;
     };
 
-    explicit StudyWidget(QWidget *parent = nullptr);
-    ~StudyWidget();
+    explicit ReviewWidget(QWidget *parent = nullptr);
+    ~ReviewWidget();
 
     void setWordList(const QList<WordInfo> &words);
-    void setDailyGoal(int goal);   // progress bar 최대값을 daily_goal로 설정
+    void showNoWordsMessage(const QString &message);
+
     void onCameraFrame(const QImage &frame);
     void onKeypointFrame(const QJsonObject &keypoint);
     void showResult(const QString &verdict,
@@ -37,13 +52,11 @@ public:
 
 signals:
     void keypointReady(int wordId, bool isDominantLeft, const QJsonArray &keypoints);
-    void studyFinished();
+    void reviewFinished();
     void wordSkipped(int wordId);
-    // 학습 완료 후 테스트 시작 요청 (단어 목록을 TestWidget에 전달)
-    void testRequested(const QList<StudyWidget::WordInfo> &words);
 
 private slots:
-    void onPrevClicked();   // ← 이전 단어
+    void onPrevClicked();
     void onNextClicked();
     void onSkipClicked();
     void onReplayClicked();
@@ -56,12 +69,11 @@ private:
     void stopRecording();
     void updateProgress();
     void applyVerdictStyle(const QString &verdict);
-    void showCompletionDialog();   // 모든 단어 완료 시 팝업
+    void showCompletionMessage();
 
-    Ui::StudyWidget *ui;
+    Ui::StudyWidget *ui;   // StudyWidget.ui 재사용
 
     QList<WordInfo> m_words;
-    int    m_dailyGoal    = 15;   // 서버에서 받은 목표 단어 수
     int    m_currentIndex = 0;
     bool   m_isRecording  = false;
     double m_playSpeed    = 1.0;

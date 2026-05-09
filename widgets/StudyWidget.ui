@@ -42,7 +42,7 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }</string>
    <property name="rightMargin"><number>0</number></property>
    <property name="bottomMargin"><number>0</number></property>
 
-   <!-- ★ headerArea: 반드시 QWidget 태그로 감싸야 ui->headerArea 접근 가능 -->
+   
    <item>
     <widget class="QWidget" name="headerArea">
      <property name="minimumSize"><size><width>0</width><height>52</height></size></property>
@@ -84,7 +84,7 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }</string>
      <property name="bottomMargin"><number>16</number></property>
      <property name="spacing"><number>14</number></property>
 
-     <!-- ★ videoArea: QWidget 태그 유지 -->
+     
      <item>
       <widget class="QWidget" name="videoArea">
        <layout class="QVBoxLayout" name="videoLayout">
@@ -186,7 +186,7 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }</string>
       </widget>
      </item>
 
-     <!-- ★ cameraArea: QWidget 태그 유지 -->
+     
      <item>
       <widget class="QWidget" name="cameraArea">
        <layout class="QVBoxLayout" name="cameraLayout">
@@ -224,7 +224,7 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }</string>
          </layout>
         </item>
 
-        <!-- ★ resultCard: 반드시 QWidget 태그로 감싸야 ui->resultCard->hide()/show() 가능 -->
+        
         <item>
          <widget class="QWidget" name="resultCard">
           <property name="visible"><bool>false</bool></property>

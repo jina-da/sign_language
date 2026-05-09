@@ -91,8 +91,7 @@ void LoginWidget::onLoginClicked()
         s.remove("saved_username");
 
     setLoading(true);
-    // emit loginRequested(username, hashPassword(password));
-    emit loginRequested(username, password);
+    emit loginRequested(username, hashPassword(password));
 }
 
 void LoginWidget::onTogglePassword()
@@ -100,6 +99,27 @@ void LoginWidget::onTogglePassword()
     bool hidden = (ui->passwordEdit->echoMode() == QLineEdit::Password);
     ui->passwordEdit->setEchoMode(hidden ? QLineEdit::Normal : QLineEdit::Password);
     ui->eyeBtn->setText(hidden ? "🙈" : "👁");
+}
+
+// ─────────────────────────────────────────────────────────────
+// reset — 로그아웃 시 호출
+// 비밀번호 필드 초기화, 에러 레이블 숨김, 버튼 복원
+// 아이디는 saveIdBox 체크 여부에 따라 유지 또는 초기화
+// ─────────────────────────────────────────────────────────────
+void LoginWidget::reset()
+{
+    // 비밀번호는 항상 초기화
+    ui->passwordEdit->clear();
+    ui->passwordEdit->setEchoMode(QLineEdit::Password);
+    ui->eyeBtn->setText("👁");
+
+    // 아이디 저장 체크 해제 상태면 아이디도 초기화
+    if (!ui->saveIdBox->isChecked())
+        ui->usernameEdit->clear();
+
+    // 에러 메시지 숨김, 버튼 복원
+    ui->errorLabel->hide();
+    setLoading(false);
 }
 
 QString LoginWidget::hashPassword(const QString &plain) const

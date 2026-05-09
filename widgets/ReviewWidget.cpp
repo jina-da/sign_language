@@ -1,11 +1,11 @@
-#include "StudyWidget.h"
-#include "ui_StudyWidget.h"
+#include "ReviewWidget.h"
+#include "ui_StudyWidget.h"   // StudyWidget.ui 재사용
 
 #include <QButtonGroup>
 #include <QDebug>
 #include <QJsonArray>
 
-StudyWidget::StudyWidget(QWidget *parent)
+ReviewWidget::ReviewWidget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::StudyWidget)
     , m_stopTimer(new QTimer(this))
@@ -14,7 +14,9 @@ StudyWidget::StudyWidget(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // 버튼들이 스페이스바로 클릭되지 않도록 포커스 정책 제거
+    // 헤더 텍스트 → "복습 모드"
+    ui->wordCountLabel->setText("복습 모드");
+
     ui->prevBtn->setFocusPolicy(Qt::NoFocus);
     ui->nextBtn->setFocusPolicy(Qt::NoFocus);
     ui->skipBtn->setFocusPolicy(Qt::NoFocus);
@@ -25,17 +27,15 @@ StudyWidget::StudyWidget(QWidget *parent)
     ui->speed150->setFocusPolicy(Qt::NoFocus);
     ui->speed200->setFocusPolicy(Qt::NoFocus);
 
-    // 1.5초 정지 감지 타이머
     m_stopTimer->setSingleShot(true);
     m_stopTimer->setInterval(1500);
     connect(m_stopTimer, &QTimer::timeout,
-            this,        &StudyWidget::onRecordingTimeout);
+            this,        &ReviewWidget::onRecordingTimeout);
 
     // 쿨다운 타이머: 녹화 종료 후 공수 자세가 풀릴 때까지 재시작 방지
     m_cooldownTimer->setSingleShot(true);
     m_cooldownTimer->setInterval(1500);   // 1.5초간 재시작 차단
 
-    // 속도 버튼 그룹
     m_speedGroup->addButton(ui->speed025);
     m_speedGroup->addButton(ui->speed050);
     m_speedGroup->addButton(ui->speed100);
@@ -44,43 +44,53 @@ StudyWidget::StudyWidget(QWidget *parent)
     m_speedGroup->setExclusive(true);
 
     connect(m_speedGroup, &QButtonGroup::buttonClicked,
-            this,         &StudyWidget::onSpeedChanged);
-
+            this,         &ReviewWidget::onSpeedChanged);
     connect(ui->prevBtn,   &QPushButton::clicked,
-            this,          &StudyWidget::onPrevClicked);
+            this,          &ReviewWidget::onPrevClicked);
     connect(ui->nextBtn,   &QPushButton::clicked,
-            this,          &StudyWidget::onNextClicked);
+            this,          &ReviewWidget::onNextClicked);
     connect(ui->skipBtn,   &QPushButton::clicked,
-            this,          &StudyWidget::onSkipClicked);
+            this,          &ReviewWidget::onSkipClicked);
     connect(ui->replayBtn, &QPushButton::clicked,
-            this,          &StudyWidget::onReplayClicked);
+            this,          &ReviewWidget::onReplayClicked);
 }
 
-StudyWidget::~StudyWidget()
+ReviewWidget::~ReviewWidget()
 {
     delete ui;
 }
 
 // ─────────────────────────────────────────────────────────────
-// setDailyGoal — progress bar 최대값을 daily_goal로 설정
-// AppController에서 RES_LOGIN/RES_DAILY_WORDS 수신 후 호출
+// showNoWordsMessage — 복습 단어 없을 때 안내
 // ─────────────────────────────────────────────────────────────
-void StudyWidget::setDailyGoal(int goal)
+void ReviewWidget::showNoWordsMessage(const QString &message)
 {
-    m_dailyGoal = goal;
-    ui->studyProgress->setMaximum(goal);
-    qDebug() << "[Study] daily_goal 설정:" << goal;
+    ui->studyProgress->setMaximum(1);
+    ui->studyProgress->setValue(0);
+    ui->wordIndexLabel->setText("0 / 0");
+
+    ui->wordLabel->setText("📭");
+    ui->meaningLabel->setText(message);
+    ui->videoPlayer->setText("");
+
+    ui->resultCard->hide();
+    ui->nextBtn->setEnabled(false);
+    ui->prevBtn->setEnabled(false);
+    ui->skipBtn->setEnabled(false);
+    ui->statusLabel->setText(message);
+    ui->recordingLabel->hide();
+
+    qDebug() << "[Review] 단어 없음:" << message;
 }
 
 // ─────────────────────────────────────────────────────────────
 // setWordList
 // ─────────────────────────────────────────────────────────────
-void StudyWidget::setWordList(const QList<WordInfo> &words)
+void ReviewWidget::setWordList(const QList<WordInfo> &words)
 {
     m_words        = words;
     m_currentIndex = 0;
-    // progress bar 최대값은 daily_goal 기준 (words.size() 아님)
-    ui->studyProgress->setMaximum(m_dailyGoal);
+    ui->studyProgress->setMaximum(words.size());
     ui->skipBtn->setEnabled(true);
     loadWord(0);
 }
@@ -88,14 +98,10 @@ void StudyWidget::setWordList(const QList<WordInfo> &words)
 // ─────────────────────────────────────────────────────────────
 // loadWord
 // ─────────────────────────────────────────────────────────────
-void StudyWidget::loadWord(int index)
+void ReviewWidget::loadWord(int index)
 {
     if (m_words.isEmpty() || index >= m_words.size()) {
-        emit studyFinished();
-        ui->skipBtn->setEnabled(false);
-        ui->nextBtn->setEnabled(false);
-        ui->prevBtn->setEnabled(false);
-        ui->statusLabel->setText("학습이 완료됐습니다!");
+        showCompletionMessage();
         return;
     }
 
@@ -107,8 +113,6 @@ void StudyWidget::loadWord(int index)
     ui->resultCard->hide();
     ui->nextBtn->setEnabled(false);
     ui->nextBtn->setText("다음 단어 →");
-
-    // 이전 단어 버튼: 첫 번째 단어이면 비활성화
     ui->prevBtn->setEnabled(index > 0);
 
     m_isRecording    = false;
@@ -116,20 +120,17 @@ void StudyWidget::loadWord(int index)
     m_stopTimer->stop();
 
     ui->recordingLabel->hide();
-    ui->statusLabel->setText(
-        "공수 자세를 취하면 자동으로 녹화가 시작됩니다");
+    ui->statusLabel->setText("공수 자세를 취하면 자동으로 녹화가 시작됩니다");
+    ui->videoPlayer->setText(QString("[%1] 영상 로딩 예정").arg(w.word));
 
-    ui->videoPlayer->setText(
-        QString("[%1] 영상 로딩 예정").arg(w.word));
-
-    qDebug() << "[Study] 단어 로드:" << w.word
+    qDebug() << "[Review] 단어 로드:" << w.word
              << "(" << index+1 << "/" << m_words.size() << ")";
 }
 
 // ─────────────────────────────────────────────────────────────
-// onCameraFrame — 카메라 프레임 표시
+// onCameraFrame
 // ─────────────────────────────────────────────────────────────
-void StudyWidget::onCameraFrame(const QImage &frame)
+void ReviewWidget::onCameraFrame(const QImage &frame)
 {
     ui->cameraView->setPixmap(
         QPixmap::fromImage(frame).scaled(
@@ -141,7 +142,7 @@ void StudyWidget::onCameraFrame(const QImage &frame)
 // ─────────────────────────────────────────────────────────────
 // onKeypointFrame
 // ─────────────────────────────────────────────────────────────
-void StudyWidget::onKeypointFrame(const QJsonObject &keypoint)
+void ReviewWidget::onKeypointFrame(const QJsonObject &keypoint)
 {
     bool isGongsu = keypoint["is_gongsu"].toBool();
 
@@ -168,45 +169,39 @@ void StudyWidget::onKeypointFrame(const QJsonObject &keypoint)
             if (joint.toArray()[2].toDouble() > 0.3) { hasHand = true; break; }
         }
     }
-
-    if (hasHand)
-        m_stopTimer->start();
+    if (hasHand) m_stopTimer->start();
 }
 
 // ─────────────────────────────────────────────────────────────
 // startRecording
 // ─────────────────────────────────────────────────────────────
-void StudyWidget::startRecording()
+void ReviewWidget::startRecording()
 {
     if (m_isRecording) return;
-
     m_isRecording    = true;
     m_keypointBuffer = QJsonArray();
     m_recordingStartTime.start();
 
     ui->recordingLabel->show();
     ui->statusLabel->setText("녹화 중... 수화를 입력하고 공수 자세로 종료하세요.");
-
-    qDebug() << "[Study] 녹화 시작";
+    qDebug() << "[Review] 녹화 시작";
 }
 
 // ─────────────────────────────────────────────────────────────
 // stopRecording
 // ─────────────────────────────────────────────────────────────
-void StudyWidget::stopRecording()
+void ReviewWidget::stopRecording()
 {
     if (!m_isRecording) return;
     m_isRecording = false;
     m_stopTimer->stop();
     m_cooldownTimer->start();   // 공수 자세 완전히 풀릴 때까지 대기
-
     ui->recordingLabel->hide();
 
     int frameCount = m_keypointBuffer.size();
-    qDebug() << "[Study] 녹화 종료, 누적 프레임:" << frameCount;
+    qDebug() << "[Review] 녹화 종료, 프레임:" << frameCount;
 
     if (m_words.isEmpty()) {
-        qWarning() << "[Study] 단어 목록 없음 - 전송 취소";
         ui->statusLabel->setText("단어 목록을 불러온 후 다시 시도해 주세요.");
         return;
     }
@@ -221,21 +216,14 @@ void StudyWidget::stopRecording()
     emit keypointReady(w.id, false, m_keypointBuffer);
 }
 
-
-// ─────────────────────────────────────────────────────────────
-// onRecordingTimeout
-// ─────────────────────────────────────────────────────────────
-void StudyWidget::onRecordingTimeout()
-{
-    stopRecording();
-}
+void ReviewWidget::onRecordingTimeout() { stopRecording(); }
 
 // ─────────────────────────────────────────────────────────────
 // showResult
 // ─────────────────────────────────────────────────────────────
-void StudyWidget::showResult(const QString &verdict,
-                              double confidence,
-                              int predictedWordId)
+void ReviewWidget::showResult(const QString &verdict,
+                               double confidence,
+                               int predictedWordId)
 {
     Q_UNUSED(predictedWordId)
 
@@ -254,13 +242,13 @@ void StudyWidget::showResult(const QString &verdict,
     else if (verdict == "partial")
         ui->statusLabel->setText("거의 맞았습니다! 다시 시도하거나 넘어가세요.");
     else
-        ui->statusLabel->setText("다시 시도해 보세요. [스페이스바]로 재녹화");
+        ui->statusLabel->setText("다시 시도해 보세요.");
 }
 
 // ─────────────────────────────────────────────────────────────
 // applyVerdictStyle
 // ─────────────────────────────────────────────────────────────
-void StudyWidget::applyVerdictStyle(const QString &verdict)
+void ReviewWidget::applyVerdictStyle(const QString &verdict)
 {
     if (verdict == "correct") {
         ui->verdictLabel->setText("✓ 정답!");
@@ -284,114 +272,93 @@ void StudyWidget::applyVerdictStyle(const QString &verdict)
 }
 
 // ─────────────────────────────────────────────────────────────
-// updateProgress  ★ 버그 수정: m_currentIndex+1 로 변경
+// updateProgress
 // ─────────────────────────────────────────────────────────────
-void StudyWidget::updateProgress()
+void ReviewWidget::updateProgress()
 {
     int total   = m_words.size();
     int current = m_currentIndex + 1;
-
-    // ★ 수정 전: setValue(m_currentIndex)  → 마지막 단어에서 90%만 참
-    // ★ 수정 후: setValue(m_currentIndex + 1) → 정확히 현재 단어 번호만큼 참
     ui->studyProgress->setValue(current);
     ui->wordIndexLabel->setText(
         QString("%1 / %2").arg(current).arg(total));
 }
 
 // ─────────────────────────────────────────────────────────────
-// onPrevClicked  ★ 신규: 이전 단어로 이동
+// showCompletionMessage — 복습 완료 시 버튼을 "완료"로 변경
 // ─────────────────────────────────────────────────────────────
-void StudyWidget::onPrevClicked()
+void ReviewWidget::showCompletionMessage()
 {
-    if (m_currentIndex <= 0) return;
-    m_currentIndex--;
-    loadWord(m_currentIndex);
-}
-
-// ─────────────────────────────────────────────────────────────
-// onNextClicked  ★ 수정: 마지막 단어 후 완료 팝업
-// ─────────────────────────────────────────────────────────────
-void StudyWidget::onNextClicked()
-{
-    if (ui->nextBtn->text() == "다시 시도") {
-        loadWord(m_currentIndex);
-        return;
-    }
-
-    // 마지막 단어 완료 후 "테스트 시작 →" 버튼을 누른 경우 (학습 모드)
-    if (ui->nextBtn->text() == "테스트 시작 →") {
-        emit testRequested(m_words);
-        return;
-    }
-
-    m_currentIndex++;
-
-    if (m_currentIndex >= m_words.size()) {
-        showCompletionDialog();
-        return;
-    }
-
-    loadWord(m_currentIndex);
-}
-
-// ─────────────────────────────────────────────────────────────
-// showCompletionDialog  ★ 신규: 모든 단어 완료 시 팝업
-// ─────────────────────────────────────────────────────────────
-void StudyWidget::showCompletionDialog()
-{
-    // 진도 바 100% 로 채우기
     ui->studyProgress->setValue(m_words.size());
     ui->wordIndexLabel->setText(
         QString("%1 / %2").arg(m_words.size()).arg(m_words.size()));
 
     ui->skipBtn->setEnabled(false);
     ui->prevBtn->setEnabled(false);
-    ui->nextBtn->setText("테스트 시작 →");
+    ui->nextBtn->setText("완료");
     ui->nextBtn->setEnabled(true);
     ui->statusLabel->setText(
-        QString("학습 완료! 단어 %1개를 모두 학습했습니다. 테스트를 시작하세요.")
+        QString("복습 완료! 단어 %1개를 모두 복습했습니다.")
         .arg(m_words.size()));
-    qDebug() << "[Study] 학습 완료 → 테스트 시작 버튼 활성화";
+
+    qDebug() << "[Review] 복습 완료 → 완료 버튼 활성화";
 }
 
 // ─────────────────────────────────────────────────────────────
-// onSkipClicked
+// 버튼 슬롯
 // ─────────────────────────────────────────────────────────────
-void StudyWidget::onSkipClicked()
+void ReviewWidget::onPrevClicked()
 {
-    if (m_words.isEmpty() || m_currentIndex >= m_words.size())
+    if (m_currentIndex <= 0) return;
+    m_currentIndex--;
+    loadWord(m_currentIndex);
+}
+
+void ReviewWidget::onNextClicked()
+{
+    if (ui->nextBtn->text() == "다시 시도") {
+        loadWord(m_currentIndex);
         return;
+    }
+    if (ui->nextBtn->text() == "완료") {
+        emit reviewFinished();
+        return;
+    }
+
+    m_currentIndex++;
+    if (m_currentIndex >= m_words.size())
+        showCompletionMessage();
+    else
+        loadWord(m_currentIndex);
+}
+
+void ReviewWidget::onSkipClicked()
+{
+    if (m_words.isEmpty() || m_currentIndex >= m_words.size()) return;
 
     emit wordSkipped(m_words[m_currentIndex].id);
     m_currentIndex++;
 
-    // 마지막 단어를 건너뛴 경우 → loadWord 내부에서 studyFinished emit 후 리턴되므로,
-    // 완료 팝업은 onNextClicked 와 동일한 흐름인 showCompletionDialog()로 공통 처리
-    if (m_currentIndex >= m_words.size()) {
-        showCompletionDialog();
-        return;
-    }
-
-    loadWord(m_currentIndex);
+    if (m_currentIndex >= m_words.size())
+        showCompletionMessage();
+    else
+        loadWord(m_currentIndex);
 }
 
-void StudyWidget::onReplayClicked()
+void ReviewWidget::onReplayClicked()
 {
-    qDebug() << "[Study] 영상 다시 보기 (VideoPlayer 연동 예정)";
+    qDebug() << "[Review] 영상 다시 보기 (VideoPlayer 연동 예정)";
 }
 
-void StudyWidget::onSpeedChanged()
+void ReviewWidget::onSpeedChanged()
 {
     QMap<QPushButton*, double> speedMap = {
-        {ui->speed025, 0.25},
-        {ui->speed050, 0.50},
-        {ui->speed100, 1.00},
-        {ui->speed150, 1.50},
+        {ui->speed025, 0.25}, {ui->speed050, 0.50},
+        {ui->speed100, 1.00}, {ui->speed150, 1.50},
         {ui->speed200, 2.00},
     };
     auto *btn = qobject_cast<QPushButton*>(m_speedGroup->checkedButton());
     if (btn && speedMap.contains(btn)) {
         m_playSpeed = speedMap[btn];
-        qDebug() << "[Study] 재생 속도:" << m_playSpeed;
+        qDebug() << "[Review] 재생 속도:" << m_playSpeed;
     }
 }

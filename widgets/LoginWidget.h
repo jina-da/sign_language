@@ -22,6 +22,7 @@ public:
     void setConnected(bool connected);
     void showError(const QString &message);
     void setLoading(bool loading);
+    void reset();   // 로그아웃 시 호출 — 비밀번호 클리어, 에러 숨김
 
 signals:
     void loginRequested(const QString &username, const QString &passwordHash);

@@ -4,6 +4,9 @@
 #include <QJsonObject>
 #include "widgets/LoginWidget.h"
 #include "widgets/MainWindow.h"
+#include "widgets/ReviewWidget.h"
+#include "widgets/DictWidget.h"
+#include "widgets/SettingsWidget.h"
 #include "widgets/StudyWidget.h"
 #include "widgets/RegisterWidget.h"
 #include "network/TcpClient.h"

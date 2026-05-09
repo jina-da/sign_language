@@ -44,6 +44,17 @@ qt_add_executable(SignLearnClient
     widgets/StudyWidget.h
     widgets/StudyWidget.cpp
     widgets/StudyWidget.ui
+    widgets/ReviewWidget.h
+    widgets/ReviewWidget.cpp
+    widgets/DictWidget.h
+    widgets/DictWidget.cpp
+    widgets/DictWidget.ui
+    widgets/SettingsWidget.h
+    widgets/SettingsWidget.cpp
+    widgets/SettingsWidget.ui
+    widgets/TestWidget.h
+    widgets/TestWidget.cpp
+    widgets/TestWidget.ui
     widgets/MainWindow.h
     widgets/MainWindow.cpp
     widgets/MainWindow.ui

@@ -74,12 +74,24 @@ AppController::AppController(QObject *parent)
 
     // ── 로그아웃 ──────────────────────────────────────
     connect(m_mainWindow, &MainWindow::logoutRequested, this, [this]{
-        m_client->sendMessage({
-            {"type",          "REQ_LOGOUT"},
-            {"session_token", m_sessionToken}
-        });
+        // 서버에 로그아웃 요청 (응답 여부와 무관하게 클라이언트는 즉시 초기화)
+        if (!m_sessionToken.isEmpty()) {
+            m_client->sendMessage({
+                {"type",          "REQ_LOGOUT"},
+                {"session_token", m_sessionToken}
+            });
+        }
+        // 즉시 세션 초기화 (서버 응답 기다리지 않음)
+        m_sessionToken.clear();
+        m_lastUsername.clear();
+
+        // 화면 초기화 — 항상 홈 탭(0)에서 시작
+        m_mainWindow->switchToHome();
+        m_loginWidget->reset();   // 비밀번호 클리어, 에러 숨김
+        m_loginWidget->setConnected(m_client->isConnected());
         m_mainWindow->hide();
         m_loginWidget->show();
+        qDebug() << "[App] 로그아웃 완료";
     });
 
     // ── 학습 모드: 키포인트 전송 ──────────────────────
@@ -99,13 +111,191 @@ AppController::AppController(QObject *parent)
                  << "frames=" << keypoints.size();
     });
 
-    // ── 학습 완료 ─────────────────────────────────────
+    // ── 학습 완료 → 홈 탭 ────────────────────────────
     connect(m_mainWindow->studyWidget(), &StudyWidget::studyFinished,
             this, [this]{
         qDebug() << "[App] 학습 완료 → 홈 탭으로 이동";
-        // 홈 탭(인덱스 0)으로 전환
-        // MainWindow의 switchTab은 private이므로 navHome 버튼을 클릭
-        // TODO: 오늘의 테스트 화면으로 전환 (추후 구현)
+        m_mainWindow->switchToHome();
+    });
+
+    // ── 학습 완료 → 테스트 시작 ──────────────────────
+    connect(m_mainWindow->studyWidget(), &StudyWidget::testRequested,
+            this, [this](const QList<StudyWidget::WordInfo> &words){
+        qDebug() << "[App] 테스트 시작, 단어 수:" << words.size();
+
+        // StudyWidget::WordInfo → TestWidget::WordInfo 변환
+        QList<TestWidget::WordInfo> testWords;
+        for (const auto &w : words)
+            testWords.append({w.id, w.word, w.meaning});
+
+        m_mainWindow->testWidget()->setWordList(testWords);
+        m_mainWindow->showTestTab();
+    });
+
+    // ── 테스트 완료/종료 → 홈 탭 ─────────────────────
+    connect(m_mainWindow->testWidget(), &TestWidget::testFinished,
+            this, [this](int correct, int total){
+        qDebug() << "[App] 테스트 완료:" << correct << "/" << total;
+        // TODO: 서버에 테스트 결과 전송 (추후 구현)
+    });
+    connect(m_mainWindow->testWidget(), &TestWidget::testAborted,
+            this, [this]{
+        qDebug() << "[App] 테스트 중단 → 홈 탭";
+        m_mainWindow->switchToHome();
+    });
+
+    // ── 테스트 키포인트 전송 ──────────────────────────
+    connect(m_mainWindow->testWidget(), &TestWidget::keypointReady,
+            this, [this](int wordId, bool isDominantLeft,
+                         const QJsonArray &keypoints) {
+        Q_UNUSED(isDominantLeft)
+        m_client->sendMessage({
+            {"type",             "REQ_INFER"},
+            {"session_token",    m_sessionToken},
+            {"word_id",          wordId},
+            {"keypoint_version", "v1"},
+            {"total_frames",     keypoints.size()},
+            {"frames",           keypoints}
+        });
+        qDebug() << "[App] 테스트 REQ_INFER 전송: word_id=" << wordId;
+    });
+
+    // ── 복습 완료 → 홈 탭 ────────────────────────────
+    connect(m_mainWindow->reviewWidget(), &ReviewWidget::reviewFinished,
+            this, [this]{
+        qDebug() << "[App] 복습 완료 → 홈 탭으로 이동";
+        m_mainWindow->switchToHome();
+    });
+
+    // ── 복습 키포인트 전송 ────────────────────────────
+    connect(m_mainWindow->reviewWidget(), &ReviewWidget::keypointReady,
+            this, [this](int wordId, bool isDominantLeft,
+                         const QJsonArray &keypoints) {
+        Q_UNUSED(isDominantLeft)
+        m_client->sendMessage({
+            {"type",             "REQ_INFER"},
+            {"session_token",    m_sessionToken},
+            {"word_id",          wordId},
+            {"keypoint_version", "v1"},
+            {"total_frames",     keypoints.size()},
+            {"frames",           keypoints}
+        });
+        qDebug() << "[App] 복습 REQ_INFER 전송: word_id=" << wordId;
+    });
+
+    // ── 홈/네비 복습 버튼 클릭 → 즉시 화면 전환 후 서버 요청
+    connect(m_mainWindow, &MainWindow::reviewModeRequested,
+            this, [this]{
+        qDebug() << "[App] 복습 화면 진입";
+
+        // 서버 연결 여부와 무관하게 즉시 복습 화면으로 전환
+        m_mainWindow->switchToReview();
+
+        if (!m_client->isConnected() || m_sessionToken.isEmpty()) {
+            // 디버그 모드 또는 오프라인: 안내 메시지 표시
+            m_mainWindow->reviewWidget()->showNoWordsMessage(
+                "서버에 연결되지 않았습니다.\n연결 후 다시 시도해 주세요.");
+            return;
+        }
+
+        m_client->sendMessage({
+            {"type",          "REQ_REVIEW_WORDS"},
+            {"session_token", m_sessionToken}
+        });
+        qDebug() << "[App] REQ_REVIEW_WORDS 전송";
+    });
+
+    // ── userBtn → 설정 탭 전환 ──────────────────────
+    connect(m_mainWindow, &MainWindow::settingsRequested, this, [this]{
+        qDebug() << "[App] 설정 탭 진입";
+        // 필요 시 서버에서 최신 설정값 요청 가능 (현재는 로그인 시 세팅된 값 사용)
+    });
+
+    // ── 사전: 정방향/역방향 검색 요청 ───────────────
+    connect(m_mainWindow->dictWidget(), &DictWidget::forwardSearchRequested,
+            this, [this](const QString &query){
+        if (!m_client->isConnected()) {
+            m_mainWindow->dictWidget()->showSearchError("서버에 연결되지 않았습니다.");
+            return;
+        }
+        m_client->sendMessage({
+            {"type",          "REQ_DICT_SEARCH"},
+            {"session_token", m_sessionToken},
+            {"query",         query},
+            {"language",      "KSL"}
+        });
+        qDebug() << "[App] REQ_DICT_SEARCH:" << query;
+    });
+
+    connect(m_mainWindow->dictWidget(), &DictWidget::reverseSearchRequested,
+            this, [this](const QJsonArray &keypoints){
+        if (!m_client->isConnected()) {
+            m_mainWindow->dictWidget()->showSearchError("서버에 연결되지 않았습니다.");
+            return;
+        }
+        m_client->sendMessage({
+            {"type",             "REQ_DICT_REVERSE"},
+            {"session_token",    m_sessionToken},
+            {"keypoint_version", "v1"},
+            {"total_frames",     keypoints.size()},
+            {"frames",           keypoints}
+        });
+        qDebug() << "[App] REQ_DICT_REVERSE, frames=" << keypoints.size();
+    });
+
+    // ── 설정: 각 항목 저장 요청 ──────────────────────
+    auto *sw = m_mainWindow->settingsWidget();
+
+    connect(sw, &SettingsWidget::dailyGoalChangeRequested,
+            this, [this](int goal){
+        m_client->sendMessage({
+            {"type",          "REQ_SET_DAILY_GOAL"},
+            {"session_token", m_sessionToken},
+            {"daily_goal",    goal}
+        });
+    });
+    connect(sw, &SettingsWidget::dominantHandChangeRequested,
+            this, [this](bool isDominantLeft){
+        m_client->sendMessage({
+            {"type",          "REQ_SET_DOMINANT_HAND"},
+            {"session_token", m_sessionToken},
+            {"dominant_hand", isDominantLeft ? QString("left") : QString("right")}
+        });
+        // keypoint_server에도 즉시 반영
+        m_mainWindow->keypointClient()->setDominantHand(isDominantLeft);
+    });
+    connect(sw, &SettingsWidget::deafChangeRequested,
+            this, [this](bool isDeaf){
+        m_client->sendMessage({
+            {"type",          "REQ_SET_DEAF"},
+            {"session_token", m_sessionToken},
+            {"is_deaf",       isDeaf}
+        });
+    });
+    connect(sw, &SettingsWidget::passwordChangeRequested,
+            this, [this](const QString &curHash, const QString &newHash){
+        m_client->sendMessage({
+            {"type",             "REQ_CHANGE_PASSWORD"},
+            {"session_token",    m_sessionToken},
+            {"current_password", curHash},
+            {"new_password",     newHash}
+        });
+    });
+    connect(sw, &SettingsWidget::consentChangeRequested,
+            this, [this](bool consent){
+        m_client->sendMessage({
+            {"type",               "REQ_SET_CONSENT"},
+            {"session_token",      m_sessionToken},
+            {"keypoint_consent",   consent}
+        });
+    });
+    connect(sw, &SettingsWidget::withdrawRequested,
+            this, [this](const QString &pwHash){
+        m_client->sendMessage({
+            {"type",          "REQ_WITHDRAW"},
+            {"session_token", m_sessionToken},
+            {"password",      pwHash}
+        });
     });
 
     qDebug() << "[App] constructor done";
@@ -158,11 +348,29 @@ void AppController::onMessageReceived(const QJsonObject &msg)
             m_mainWindow->keypointClient()->setDominantHand(isDominantLeft);
 
             m_mainWindow->setUserInfo(m_lastUsername, isDominantLeft);
-            m_mainWindow->setTodayProgress(0, 15);
+            // 설정 화면 초기값 세팅
+            // RES_LOGIN에 포함된 필드만 반영하고 나머지는 기본값 사용
+            // 서버팀 요청사항: RES_LOGIN에 is_deaf, keypoint_consent, daily_goal 추가
+            bool isDeaf      = msg.contains("is_deaf")
+                               ? msg["is_deaf"].toBool()
+                               : false;
+            bool consent     = msg.contains("keypoint_consent")
+                               ? msg["keypoint_consent"].toBool()
+                               : true;
+            int  dailyGoal   = msg.contains("daily_goal")
+                               ? msg["daily_goal"].toInt()
+                               : 15;
+
+            m_mainWindow->settingsWidget()->setInitialValues(
+                dailyGoal, isDominantLeft, isDeaf, consent);
+            m_mainWindow->setTodayProgress(0, dailyGoal);
+
             m_mainWindow->resize(1024, 680);
             m_mainWindow->show();
             m_loginWidget->hide();
 
+            qDebug() << "[App] REQ_DAILY_WORDS 전송, token:"
+                     << m_sessionToken.left(8) << "...";
             m_client->sendMessage({
                 {"type",          "REQ_DAILY_WORDS"},
                 {"session_token", m_sessionToken}
@@ -184,9 +392,9 @@ void AppController::onMessageReceived(const QJsonObject &msg)
     }
 
     // ── 104: 로그아웃 응답 ────────────────────────────
+    // 토큰은 요청 시점에 이미 클리어됨 — 여기서는 확인 로그만
     else if (type == "RES_LOGOUT") {
-        m_sessionToken.clear();
-        qDebug() << "[App] 로그아웃 완료";
+        qDebug() << "[App] RES_LOGOUT 수신 (서버 세션 종료 확인)";
     }
 
     // ── 202: 오늘의 단어 응답 ─────────────────────────
@@ -201,49 +409,197 @@ void AppController::onMessageReceived(const QJsonObject &msg)
                 w.value("difficulty").toInt(1)
             });
         }
+
+        // daily_goal: RES_LOGIN에서 이미 세팅됐으므로 덮어쓰지 않음
+        // RES_DAILY_WORDS에도 포함된 경우에만 갱신 (서버 응답 우선)
+        if (msg.contains("daily_goal")) {
+            int goal = msg["daily_goal"].toInt();
+            m_mainWindow->setDailyGoal(goal);
+            m_mainWindow->settingsWidget()->updateDailyGoal(goal);
+            qDebug() << "[App] daily_goal 갱신:" << goal;
+        }
+
+        // StudyWidget progress bar 최대값 = daily_goal (words.size() 아님)
+        m_mainWindow->studyWidget()->setDailyGoal(
+            m_mainWindow->settingsWidget()->currentDailyGoal());
         m_mainWindow->studyWidget()->setWordList(words);
-
-        // daily_goal이 포함되어 있으면 반영, 없으면 단어 수로 대체
-        int goal = msg.contains("daily_goal")
-            ? msg["daily_goal"].toInt()
-            : words.size();
-        m_mainWindow->setTodayProgress(0, goal);
-
-        qDebug() << "[App] 단어 목록 수신:" << words.size() << "개 / 목표:" << goal;
+        qDebug() << "[App] 단어 목록 수신:" << words.size() << "개";
     }
 
     // ── 204: 추론 결과 응답 ───────────────────────────
     else if (type == "RES_INFER") {
-        // result: true=정답 / false=오답
-        // accuracy: 0.0~1.0 → 퍼센트로 변환
         bool   isCorrect = msg["result"].toBool();
         double accuracy  = msg["accuracy"].toDouble() * 100.0;
         int    wordId    = msg["word_id"].toInt();
 
         QString verdict;
-        if (isCorrect)
-            verdict = "correct";
-        else if (accuracy >= 50.0)
-            verdict = "partial";
-        else
-            verdict = "incorrect";
+        if (isCorrect)             verdict = "correct";
+        else if (accuracy >= 50.0) verdict = "partial";
+        else                       verdict = "incorrect";
 
-        m_mainWindow->studyWidget()->showResult(verdict, accuracy, wordId);
+        // 현재 활성 위젯에 따라 결과 전달
+        QWidget *current = m_mainWindow->currentWidget();
+        if (current == m_mainWindow->testWidget()) {
+            m_mainWindow->testWidget()->showResult(
+                isCorrect, msg["accuracy"].toDouble(), wordId);
+        } else if (current == m_mainWindow->reviewWidget()) {
+            m_mainWindow->reviewWidget()->showResult(verdict, accuracy, wordId);
+        } else {
+            m_mainWindow->studyWidget()->showResult(verdict, accuracy, wordId);
+        }
         qDebug() << "[App] RES_INFER: result=" << isCorrect
                  << "accuracy=" << accuracy << "%";
     }
 
     // ── 206: 복습 단어 응답 ───────────────────────────
     else if (type == "RES_REVIEW_WORDS") {
-        // TODO: 복습 모드 구현 시 처리
-        qDebug() << "[App] RES_REVIEW_WORDS 수신";
+        QList<StudyWidget::WordInfo> words;
+        for (const auto &v : msg["words"].toArray()) {
+            QJsonObject w = v.toObject();
+            words.append({
+                w["id"].toInt(),
+                w["word"].toString(),
+                w.value("meaning").toString(),
+                w.value("difficulty").toInt(1)
+            });
+        }
+        qDebug() << "[App] 복습 단어 수신:" << words.size() << "개";
+
+        // 화면 전환은 reviewModeRequested 시점에 이미 완료됨
+        if (words.isEmpty()) {
+            m_mainWindow->reviewWidget()->showNoWordsMessage(
+                "오늘 복습할 단어가 없습니다.\n학습을 먼저 진행해 주세요.");
+            qDebug() << "[App] 복습할 단어 없음 → 안내 메시지 표시";
+            return;
+        }
+
+        // ReviewWidget::WordInfo로 변환
+        QList<ReviewWidget::WordInfo> reviewWords;
+        for (const auto &w : words)
+            reviewWords.append({w.id, w.word, w.meaning, w.difficulty});
+        m_mainWindow->reviewWidget()->setWordList(reviewWords);
+    }
+
+    // ── 302: 정방향 사전 검색 응답 ──────────────────────
+    else if (type == "RES_DICT_SEARCH") {
+        if (msg["status"].toString() == "ok") {
+            m_mainWindow->dictWidget()->showForwardResult(
+                msg["word"].toString(),
+                msg.value("description").toString(),
+                msg.value("video_cdn_url").toString()
+            );
+        } else {
+            m_mainWindow->dictWidget()->showSearchError("검색 결과가 없습니다.");
+        }
+    }
+
+    // ── 304: 역방향 사전 검색 응답 ──────────────────────
+    else if (type == "RES_DICT_REVERSE") {
+        if (msg["status"].toString() == "ok") {
+            m_mainWindow->dictWidget()->showReverseResult(
+                msg["word"].toString(),
+                msg.value("description").toString()
+            );
+        } else {
+            m_mainWindow->dictWidget()->showSearchError("수화를 인식하지 못했습니다. 다시 시도해 주세요.");
+        }
+    }
+
+    // ── 802: 목표 단어 수 변경 응답 ─────────────────────
+    else if (type == "RES_SET_DAILY_GOAL") {
+        if (msg["status"].toString() == "ok") {
+            int goal = msg["daily_goal"].toInt();
+            // done 값 보존 — setDailyGoal은 goal만 갱신
+            m_mainWindow->setDailyGoal(goal);
+            // StudyWidget progress bar 최대값도 갱신
+            // (단어 목록은 다음 REQ_DAILY_WORDS 응답 시 자동 갱신됨)
+            m_mainWindow->settingsWidget()->onSaveSuccess("goal");
+            qDebug() << "[App] 목표 단어 수 변경:" << goal;
+        } else {
+            m_mainWindow->settingsWidget()->onSaveError("목표 단어 수 변경에 실패했습니다.");
+        }
+    }
+
+    // ── 804: 우세손 변경 응답 ────────────────────────────
+    else if (type == "RES_SET_DOMINANT_HAND") {
+        if (msg["status"].toString() == "ok")
+            m_mainWindow->settingsWidget()->onSaveSuccess("hand");
+        else
+            m_mainWindow->settingsWidget()->onSaveError("우세손 변경에 실패했습니다.");
+    }
+
+    // ── 806: 농인 여부 변경 응답 ─────────────────────────
+    else if (type == "RES_SET_DEAF") {
+        if (msg["status"].toString() == "ok")
+            m_mainWindow->settingsWidget()->onSaveSuccess("deaf");
+        else
+            m_mainWindow->settingsWidget()->onSaveError("농인 여부 변경에 실패했습니다.");
+    }
+
+    // ── 808: 비밀번호 변경 응답 ──────────────────────────
+    else if (type == "RES_CHANGE_PASSWORD") {
+        if (msg["status"].toString() == "ok")
+            m_mainWindow->settingsWidget()->onSaveSuccess("password");
+        else
+            m_mainWindow->settingsWidget()->onSaveError("현재 비밀번호가 올바르지 않습니다.");
+    }
+
+    // ── 810: 키포인트 동의 변경 응답 ─────────────────────
+    else if (type == "RES_SET_CONSENT") {
+        if (msg["status"].toString() == "ok")
+            m_mainWindow->settingsWidget()->onSaveSuccess("consent");
+        else
+            m_mainWindow->settingsWidget()->onSaveError("동의 설정 변경에 실패했습니다.");
+    }
+
+    // ── 812: 회원 탈퇴 응답 ──────────────────────────────
+    else if (type == "RES_WITHDRAW") {
+        if (msg["status"].toString() == "ok") {
+            m_mainWindow->settingsWidget()->onWithdrawSuccess();
+            // 세션 종료 후 로그인 화면으로
+            m_sessionToken.clear();
+            m_mainWindow->hide();
+            m_loginWidget->show();
+            qDebug() << "[App] 회원 탈퇴 완료 → 로그인 화면";
+        } else {
+            m_mainWindow->settingsWidget()->onSaveError("비밀번호가 올바르지 않습니다.");
+        }
     }
 
     // ── 703: 오류 응답 ────────────────────────────────
     else if (type == "RES_ERROR") {
-        QString err = msg["message"].toString();
-        qWarning() << "[App] 서버 오류:" << msg["error_code"].toInt() << err;
-        m_loginWidget->showError("오류: " + err);
+        int    errCode = msg["error_code"].toInt();
+        QString err    = msg["message"].toString();
+        qWarning() << "[App] 서버 오류:" << errCode << err;
+
+        // not_authenticated(1003): 세션이 없는 상태의 오류
+        // → 로그인 화면이 보이면 거기에 표시, 아니면 무시
+        if (errCode == 1003) {
+            if (m_sessionToken.isEmpty()) {
+                // 로그인 전 상태 — 로그인 화면에 표시
+                m_loginWidget->showError("인증 오류가 발생했습니다. 다시 로그인해 주세요.");
+            } else {
+                // 로그인 상태에서 발생 — 세션 만료로 간주, 로그아웃 처리
+                qWarning() << "[App] 세션 만료 → 강제 로그아웃";
+                m_sessionToken.clear();
+                m_lastUsername.clear();
+                m_loginWidget->reset();
+                m_loginWidget->setConnected(m_client->isConnected());
+                m_loginWidget->showError("세션이 만료됐습니다. 다시 로그인해 주세요.");
+                m_mainWindow->hide();
+                m_loginWidget->show();
+            }
+            return;
+        }
+
+        // 그 외 오류: 현재 표시 중인 화면에 따라 분기
+        if (m_sessionToken.isEmpty()) {
+            m_loginWidget->showError("오류: " + err);
+        } else {
+            // 메인 화면 중 오류 — 설정 화면이 열려있으면 설정에 표시
+            m_mainWindow->settingsWidget()->onSaveError("서버 오류: " + err);
+            qWarning() << "[App] 메인 화면 서버 오류:" << err;
+        }
     }
 
     else {

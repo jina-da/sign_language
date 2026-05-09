@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>DictWidget</class>
+ <widget class="QWidget" name="DictWidget">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>900</width><height>600</height></rect>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QWidget#DictWidget { background: #F0F7EE; }
+QWidget#headerArea { background: white; border-bottom: 1px solid #C0DD97; }
+QLabel#headerLabel { font-size: 14px; font-weight: 500; color: #27500A; }
+QPushButton#tabForwardBtn, QPushButton#tabReverseBtn {
+    font-size: 13px; border: none; padding: 0 20px; background: transparent;
+}
+QPushButton#tabForwardBtn[active="true"], QPushButton#tabReverseBtn[active="true"] {
+    color: #3B6D11; font-weight: 500; border-bottom: 2px solid #3B6D11;
+}
+QPushButton#tabForwardBtn[active="false"], QPushButton#tabReverseBtn[active="false"] {
+    color: #5F5E5A; border-bottom: 2px solid transparent;
+}
+QWidget#forwardPage { background: #F0F7EE; }
+QWidget#reversePage { background: #F0F7EE; }
+QWidget#resultCard { background: white; border-radius: 14px; border: 1px solid #C0DD97; }
+QLabel#resultWordLabel { font-size: 32px; font-weight: 500; color: #27500A; }
+QLabel#resultDescLabel { font-size: 14px; color: #5F5E5A; }
+QLabel#resultVideoLabel { background: #1a1a2e; border-radius: 10px; color: #888780; font-size: 13px; }
+QLabel#noResultLabel { font-size: 14px; color: #888780; }
+QLineEdit#searchEdit {
+    border: 1px solid #C0DD97; border-radius: 10px;
+    padding: 8px 16px 8px 38px;
+    font-size: 14px; color: #27500A;
+    background: white;
+}
+QLineEdit#searchEdit:focus { border-color: #639922; }
+QPushButton#searchBtn {
+    background: #3B6D11; color: white; border: none;
+    border-radius: 10px; font-size: 13px;
+    font-weight: 500; padding: 8px 20px;
+}
+QPushButton#searchBtn:hover { background: #27500A; }
+QWidget#cameraArea { background: white; border-radius: 14px; border: 1px solid #C0DD97; }
+QLabel#cameraView { background: #1a1a2e; border-radius: 10px; color: #888780; font-size: 14px; }
+QLabel#recordingLabel { font-size: 13px; color: #E24B4A; font-weight: 500; }
+QLabel#statusLabel { font-size: 13px; color: #5F5E5A; }
+QWidget#reverseResultCard { background: white; border-radius: 14px; border: 1px solid #C0DD97; }
+QLabel#reverseWordLabel { font-size: 28px; font-weight: 500; color: #27500A; }
+QLabel#reverseDescLabel { font-size: 13px; color: #5F5E5A; }</string>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <property name="spacing"><number>0</number></property>
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+    <widget class="QWidget" name="headerArea">
+     <property name="minimumSize"><size><width>0</width><height>52</height></size></property>
+     <property name="maximumSize"><size><width>16777215</width><height>52</height></size></property>
+     <layout class="QHBoxLayout" name="headerLayout">
+      <property name="leftMargin"><number>20</number></property>
+      <property name="rightMargin"><number>20</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+      <property name="spacing"><number>0</number></property>
+      <item>
+       <widget class="QLabel" name="headerLabel">
+        <property name="text"><string>수화 사전</string></property>
+        <property name="minimumSize"><size><width>80</width><height>0</height></size></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="tabForwardBtn">
+        <property name="text"><string>정방향</string></property>
+        <property name="minimumSize"><size><width>0</width><height>52</height></size></property>
+        <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+        <property name="checkable"><bool>false</bool></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="tabReverseBtn">
+        <property name="text"><string>역방향</string></property>
+        <property name="minimumSize"><size><width>0</width><height>52</height></size></property>
+        <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+        <property name="checkable"><bool>false</bool></property>
+       </widget>
+      </item>
+      <item>
+       <spacer>
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+       </spacer>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QStackedWidget" name="dictStack">
+     <widget class="QWidget" name="forwardPage">
+      <layout class="QVBoxLayout" name="forwardLayout">
+       <property name="leftMargin"><number>24</number></property>
+       <property name="topMargin"><number>20</number></property>
+       <property name="rightMargin"><number>24</number></property>
+       <property name="bottomMargin"><number>20</number></property>
+       <property name="spacing"><number>16</number></property>
+       <item>
+        <layout class="QHBoxLayout" name="searchRow">
+         <property name="spacing"><number>10</number></property>
+         <item>
+          <widget class="QLineEdit" name="searchEdit">
+           <property name="placeholderText"><string>🔍  단어를 입력하세요</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="searchBtn">
+           <property name="text"><string>검색</string></property>
+           <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="noResultLabel">
+         <property name="text"><string>검색어를 입력하면 결과가 표시됩니다</string></property>
+         <property name="alignment"><set>Qt::AlignCenter</set></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QWidget" name="resultCard">
+         <property name="visible"><bool>false</bool></property>
+         <layout class="QHBoxLayout" name="resultCardLayout">
+          <property name="leftMargin"><number>24</number></property>
+          <property name="topMargin"><number>24</number></property>
+          <property name="rightMargin"><number>24</number></property>
+          <property name="bottomMargin"><number>24</number></property>
+          <property name="spacing"><number>24</number></property>
+          <item>
+           <layout class="QVBoxLayout" name="resultInfoLayout">
+            <property name="spacing"><number>12</number></property>
+            <item>
+             <widget class="QLabel" name="resultWordLabel">
+              <property name="text"><string>단어</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="resultDescLabel">
+              <property name="text"><string>뜻/설명이 여기에 표시됩니다</string></property>
+              <property name="wordWrap"><bool>true</bool></property>
+             </widget>
+            </item>
+            <item>
+             <spacer>
+              <property name="orientation"><enum>Qt::Vertical</enum></property>
+              <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QLabel" name="resultVideoLabel">
+            <property name="text"><string>영상 재생 예정</string></property>
+            <property name="alignment"><set>Qt::AlignCenter</set></property>
+            <property name="minimumSize"><size><width>280</width><height>210</height></size></property>
+            <property name="maximumSize"><size><width>320</width><height>240</height></size></property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer>
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="reversePage">
+      <layout class="QHBoxLayout" name="reverseLayout">
+       <property name="leftMargin"><number>24</number></property>
+       <property name="topMargin"><number>20</number></property>
+       <property name="rightMargin"><number>24</number></property>
+       <property name="bottomMargin"><number>20</number></property>
+       <property name="spacing"><number>16</number></property>
+       <item>
+        <widget class="QWidget" name="cameraArea">
+         <layout class="QVBoxLayout" name="cameraLayout">
+          <property name="leftMargin"><number>16</number></property>
+          <property name="topMargin"><number>16</number></property>
+          <property name="rightMargin"><number>16</number></property>
+          <property name="bottomMargin"><number>16</number></property>
+          <property name="spacing"><number>12</number></property>
+          <item>
+           <widget class="QLabel" name="cameraView">
+            <property name="text"><string>카메라 준비 중...</string></property>
+            <property name="alignment"><set>Qt::AlignCenter</set></property>
+            <property name="minimumSize"><size><width>0</width><height>280</height></size></property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="statusRow">
+            <item>
+             <widget class="QLabel" name="recordingLabel">
+              <property name="text"><string>● 녹화 중</string></property>
+              <property name="visible"><bool>false</bool></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="statusLabel">
+              <property name="text"><string>공수 자세를 취하면 자동으로 시작됩니다</string></property>
+             </widget>
+            </item>
+            <item>
+             <spacer>
+              <property name="orientation"><enum>Qt::Horizontal</enum></property>
+              <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <layout class="QVBoxLayout" name="reverseResultLayout">
+         <property name="spacing"><number>16</number></property>
+         <item>
+          <widget class="QLabel" name="reverseHintLabel">
+           <property name="text"><string>수화를 입력하면 해당 단어를 찾아드립니다</string></property>
+           <property name="styleSheet"><string>font-size:13px; color:#888780;</string></property>
+           <property name="wordWrap"><bool>true</bool></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QWidget" name="reverseResultCard">
+           <property name="visible"><bool>false</bool></property>
+           <layout class="QVBoxLayout" name="reverseResultCardLayout">
+            <property name="leftMargin"><number>20</number></property>
+            <property name="topMargin"><number>20</number></property>
+            <property name="rightMargin"><number>20</number></property>
+            <property name="bottomMargin"><number>20</number></property>
+            <property name="spacing"><number>10</number></property>
+            <item>
+             <widget class="QLabel" name="reverseWordLabel">
+              <property name="text"><string>인식된 단어</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="reverseDescLabel">
+              <property name="text"><string>설명이 여기에 표시됩니다</string></property>
+              <property name="wordWrap"><bool>true</bool></property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <spacer>
+           <property name="orientation"><enum>Qt::Vertical</enum></property>
+           <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
