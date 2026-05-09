@@ -1,19 +1,20 @@
 """
 AI 서버
 - 운용서버로부터 TCP 9100으로 keypoint 수신
-- Transformer 모델로 추론
-- 결과 반환: {word_id, confidence, predicted_word}
+- GRU 모델로 추론
+- 결과 반환: {predicted_word_id, confidence, inference_ms}
 - 모델 무중단 교체 지원
 """
 
 import asyncio
 import json
+import time
 import numpy as np
 import torch
 from pathlib import Path
 from datetime import datetime
 
-from model import build_model
+from model import build_gru_model  # ✅ GRU로 변경
 
 # ── 설정 ───────────────────────────────────────────────
 HOST        = "0.0.0.0"
@@ -22,6 +23,11 @@ MODEL_PATH  = Path("data/models/best_model.pt")
 LABELS_PATH = Path("data/processed/labels.npy")
 NUM_CLASSES = 1000
 DEVICE      = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# 운용서버 프로토콜 타입명
+REQ_AI_INFER = "REQ_AI_INFER"
+RES_AI_INFER = "RES_AI_INFER"
+REQ_RELOAD   = "REQ_MODEL_DEPLOY"  # NO.604
 
 
 def now() -> str:
@@ -34,25 +40,25 @@ class AIServer:
     AI 추론 서버
     - asyncio 기반 비동기 TCP 서버
     - 여러 운용서버 요청 동시 처리 가능
-    - 모델 무중단 교체 지원 (reload_model 호출)
+    - 모델 무중단 교체 지원
     """
 
     def __init__(self):
         self.model  = None
-        self.labels = None  # 라벨 번호 → 단어명 매핑
+        self.labels = None  # 클래스 인덱스 → 단어명 매핑
         self.lock   = asyncio.Lock()  # 모델 교체 중 추론 방지
 
     def load_model(self, model_path: Path = MODEL_PATH):
         """
         모델 및 라벨 로드
-        model_path: 로드할 모델 파일 경로 (기본: best_model.pt)
+        model_path: 로드할 모델 파일 경로
         """
         print(f"[{now()}] 모델 로드 중... ({DEVICE})")
 
-        model = build_model(NUM_CLASSES).to(DEVICE)
+        model = build_gru_model(NUM_CLASSES).to(DEVICE)  # ✅ GRU
         checkpoint = torch.load(model_path, map_location=DEVICE)
         model.load_state_dict(checkpoint['model_state_dict'])
-        model.eval()  # 추론 모드
+        model.eval()
 
         self.model  = model
         self.labels = np.load(LABELS_PATH, allow_pickle=True)
@@ -62,46 +68,52 @@ class AIServer:
     async def reload_model(self, model_path: Path = MODEL_PATH):
         """
         모델 무중단 교체
-        - 새 모델 로드 완료 후 교체 (추론 중단 없음)
-        - lock으로 교체 중 추론 방지
+        새 모델 로드 완료 후 교체 → 추론 중단 없음
         """
         print(f"[{now()}] 모델 교체 시작...")
 
-        # 새 모델 미리 로드
-        new_model = build_model(NUM_CLASSES).to(DEVICE)
+        new_model = build_gru_model(NUM_CLASSES).to(DEVICE)  # ✅ GRU
         checkpoint = torch.load(model_path, map_location=DEVICE)
         new_model.load_state_dict(checkpoint['model_state_dict'])
         new_model.eval()
 
-        # lock 걸고 교체 (추론 중이면 대기)
         async with self.lock:
             self.model = new_model
             print(f"[{now()}] 모델 교체 완료 (val_acc: {checkpoint['val_acc']:.4f})")
 
     @torch.no_grad()
-    def infer(self, keypoints: list) -> dict:
+    def infer(self, frames: list) -> dict:
         """
         keypoint 시퀀스 추론
-        keypoints: [[x, y, x, y, ...] × T프레임] 형태의 리스트
-        반환: {word_id, word, confidence}
+        frames: [[x, y, ...] × T프레임] 형태 (T, 134)
+        반환: {predicted_word_id, confidence} — DB id 기준 (클래스 인덱스 + 1)
         """
+        t0 = time.monotonic()
+
         # numpy → tensor 변환
-        seq = np.array(keypoints, dtype=np.float32)  # (T, 134)
+        seq = np.array(frames, dtype=np.float32)      # (T, 134)
         x   = torch.tensor(seq).unsqueeze(0).to(DEVICE)  # (1, T, 134)
 
-        # 추론
-        logits     = self.model(x)                    # (1, 1000)
-        probs      = torch.softmax(logits, dim=1)     # 확률값으로 변환
-        confidence, pred_idx = probs.max(dim=1)       # 가장 높은 확률
+        # padding_mask 없음 (단일 시퀀스, 패딩 불필요)
+        padding_mask = torch.zeros(1, x.shape[1], dtype=torch.bool).to(DEVICE)
 
-        word_id   = int(pred_idx.item())
-        word_name = str(self.labels[word_id])
-        conf      = float(confidence.item())
+        # 추론
+        logits     = self.model(x, padding_mask)       # (1, 1000)
+        probs      = torch.softmax(logits, dim=1)
+        confidence, pred_idx = probs.max(dim=1)
+
+        class_idx         = int(pred_idx.item())
+        predicted_word_id = class_idx + 1              # ✅ 클래스 인덱스 → DB id 변환
+        conf              = float(confidence.item())
+        inference_ms      = int((time.monotonic() - t0) * 1000)
+
+        word_name = str(self.labels[class_idx])        # 로그용
+        print(f"[{now()}] 추론: {word_name} (word_id={predicted_word_id}, confidence={conf:.4f}, {inference_ms}ms)")
 
         return {
-            "word_id":    word_id,
-            "word":       word_name,
-            "confidence": conf
+            "predicted_word_id": predicted_word_id,    # ✅ DB id (1~1000)
+            "confidence":        round(conf, 4),
+            "inference_ms":      inference_ms,
         }
 
     async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
@@ -122,29 +134,35 @@ class AIServer:
                 body = await reader.readexactly(msg_len)
                 data = json.loads(body.decode('utf-8'))
 
-                # 3. 요청 타입 확인
-                req_type = data.get('type', 'infer')
+                req_type   = data.get('type', '')
+                request_id = data.get('request_id', '')
 
-                if req_type == 'reload':
-                    # 모델 교체 요청 (운용서버 → AI서버)
-                    model_path = data.get('model_path', str(MODEL_PATH))
+                if req_type == REQ_AI_INFER:
+                    # 추론 요청 (NO.501)
+                    frames = data.get('frames')
+                    if not frames:
+                        response = {"type": RES_AI_INFER, "request_id": request_id, "error": "frames 없음"}
+                    else:
+                        async with self.lock:
+                            result = self.infer(frames)
+                        response = {
+                            "type":              RES_AI_INFER,
+                            "request_id":        request_id,   # ✅ 운용서버 매칭용
+                            "predicted_word_id": result["predicted_word_id"],
+                            "confidence":        result["confidence"],
+                            "inference_ms":      result["inference_ms"],
+                        }
+
+                elif req_type == REQ_RELOAD:
+                    # 모델 교체 요청 (NO.604)
+                    model_path = data.get('new_model_path', str(MODEL_PATH))
                     await self.reload_model(Path(model_path))
                     response = {"status": "ok", "message": "모델 교체 완료"}
 
-                elif req_type == 'infer':
-                    # 추론 요청
-                    keypoints = data.get('keypoints')
-                    if keypoints is None:
-                        response = {"error": "keypoints 없음"}
-                    else:
-                        # lock으로 모델 교체 중 추론 방지
-                        async with self.lock:
-                            response = self.infer(keypoints)
-                        print(f"[{now()}] 추론 결과: {response['word']} (confidence: {response['confidence']:.4f})")
                 else:
                     response = {"error": f"알 수 없는 요청 타입: {req_type}"}
 
-                # 4. 결과 반환 (4바이트 헤더 + JSON)
+                # 3. 결과 반환 (4바이트 헤더 + JSON)
                 resp_body   = json.dumps(response, ensure_ascii=False).encode('utf-8')
                 resp_header = len(resp_body).to_bytes(4, byteorder='big')
                 writer.write(resp_header + resp_body)
