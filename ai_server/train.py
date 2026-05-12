@@ -185,9 +185,9 @@ def main():
     test_labels  = labels[test_idx]
 
     # ── train만 증강 ───────────────────────────────────
-    # print("train 데이터 증강 중...")
-    # train_seqs, train_labels = augment_sequences(train_seqs, train_labels)
-    # print(f"train: {len(train_seqs)} | val: {len(val_seqs)} | test: {len(test_seqs)}")
+    print("train 데이터 증강 중...")
+    train_seqs, train_labels = augment_sequences(train_seqs, train_labels)
+    print(f"train: {len(train_seqs)} | val: {len(val_seqs)} | test: {len(test_seqs)}")
 
     # ── DataLoader ─────────────────────────────────────
     train_loader = DataLoader(SignLanguageDataset(train_seqs, train_labels),
@@ -199,12 +199,15 @@ def main():
 
     # ── 모델, 옵티마이저, 손실함수 ─────────────────────
     model = build_gru_model(NUM_CLASSES).to(DEVICE)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=LR
+    )
     criterion = nn.CrossEntropyLoss()
 
     # 학습률 스케줄러
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', patience=5, factor=0.5
+        optimizer, mode='min', patience=5, factor=0.7
     )
 
     # ── 학습 루프 ──────────────────────────────────────

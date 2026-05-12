@@ -177,10 +177,10 @@ def build_gru_model(num_classes: int = 1000) -> SignLanguageGRU:
     """GRU 모델 생성"""
     return SignLanguageGRU(
         input_dim=134,
-        hidden_dim=256,
+        hidden_dim=512,
         num_layers=3,
         num_classes=num_classes,
-        dropout=0.3
+        dropout=0.4
     )
 
 
