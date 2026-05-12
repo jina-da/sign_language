@@ -365,6 +365,12 @@ void AppController::onMessageReceived(const QJsonObject &msg)
                 dailyGoal, isDominantLeft, isDeaf, consent);
             m_mainWindow->setTodayProgress(0, dailyGoal);
 
+            // VideoPlayer 세션 세팅
+            m_mainWindow->studyWidget()->videoPlayer()->setSession(
+                "10.10.10.114", m_sessionToken);
+            m_mainWindow->dictWidget()->setSession(
+                "10.10.10.114", m_sessionToken);
+
             m_mainWindow->resize(1024, 680);
             m_mainWindow->show();
             m_loginWidget->hide();
@@ -402,11 +408,15 @@ void AppController::onMessageReceived(const QJsonObject &msg)
         QList<StudyWidget::WordInfo> words;
         for (const auto &v : msg["words"].toArray()) {
             QJsonObject w = v.toObject();
+            QString cdnUrl = w.value("video_cdn_url").toString();
+            qDebug() << "[App] word=" << w["word"].toString()
+                     << "video_cdn_url=" << cdnUrl;
             words.append({
                 w["id"].toInt(),
                 w["word"].toString(),
                 w.value("meaning").toString(),
-                w.value("difficulty").toInt(1)
+                w.value("difficulty").toInt(1),
+                cdnUrl
             });
         }
 
@@ -456,11 +466,15 @@ void AppController::onMessageReceived(const QJsonObject &msg)
         QList<StudyWidget::WordInfo> words;
         for (const auto &v : msg["words"].toArray()) {
             QJsonObject w = v.toObject();
+            QString cdnUrl = w.value("video_cdn_url").toString();
+            qDebug() << "[App] word=" << w["word"].toString()
+                     << "video_cdn_url=" << cdnUrl;
             words.append({
                 w["id"].toInt(),
                 w["word"].toString(),
                 w.value("meaning").toString(),
-                w.value("difficulty").toInt(1)
+                w.value("difficulty").toInt(1),
+                cdnUrl
             });
         }
         qDebug() << "[App] 복습 단어 수신:" << words.size() << "개";
@@ -482,12 +496,40 @@ void AppController::onMessageReceived(const QJsonObject &msg)
 
     // ── 302: 정방향 사전 검색 응답 ──────────────────────
     else if (type == "RES_DICT_SEARCH") {
+        qDebug() << "[App] RES_DICT_SEARCH 전체:" << msg;
         if (msg["status"].toString() == "ok") {
-            m_mainWindow->dictWidget()->showForwardResult(
-                msg["word"].toString(),
-                msg.value("description").toString(),
-                msg.value("video_cdn_url").toString()
-            );
+            QList<DictWidget::DictResult> results;
+
+            // description/meaning 둘 다 체크 (서버 필드명 대응)
+            auto getDesc = [](const QJsonObject &o) -> QString {
+                if (o.contains("meaning") && !o["meaning"].toString().isEmpty())
+                    return o["meaning"].toString();
+                return o.value("description").toString();
+            };
+
+            // 서버가 배열로 보내는 경우
+            if (msg.contains("results") && msg["results"].isArray()) {
+                for (const auto &v : msg["results"].toArray()) {
+                    QJsonObject r = v.toObject();
+                    results.append({
+                        r["word_id"].toInt(),
+                        r["word"].toString(),
+                        getDesc(r),
+                        r.value("video_cdn_url").toString()
+                    });
+                }
+            } else {
+                // 단일 결과로 보내는 경우 (기존 명세 호환)
+                results.append({
+                    msg["word_id"].toInt(),
+                    msg["word"].toString(),
+                    getDesc(msg),
+                    msg.value("video_cdn_url").toString()
+                });
+            }
+
+            m_mainWindow->dictWidget()->showForwardResult(results);
+            qDebug() << "[App] RES_DICT_SEARCH 결과:" << results.size() << "개";
         } else {
             m_mainWindow->dictWidget()->showSearchError("검색 결과가 없습니다.");
         }

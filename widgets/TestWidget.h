@@ -7,6 +7,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QImage>
+#include <QKeyEvent>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class TestWidget; }
@@ -45,12 +46,17 @@ signals:
     // wordId에 해당하는 영상을 speed 배속으로 재생
     void videoPlayRequested(int wordId, double speed);
 
+protected:
+    void keyPressEvent(QKeyEvent *event) override;
+
 private slots:
     void onNextClicked();
     void onHomeClicked();
     void onReplayClicked();
     void onSpeedChanged();
     void onRecordingTimeout();
+    void onRecordBtnClicked();
+    void onCountdownTick();
 
 private:
     void loadWord(int index);
@@ -71,6 +77,8 @@ private:
 
     QJsonArray    m_keypointBuffer;
     QTimer       *m_stopTimer;
-    QTimer       *m_cooldownTimer;  // 녹화 종료 후 재시작 방지 (1.5초)
+    QTimer       *m_cooldownTimer;
+    QTimer       *m_countdownTimer;
+    int            m_countdown = 0;
     QElapsedTimer m_recordingStartTime;
 };

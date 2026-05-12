@@ -15,8 +15,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Network)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Network)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Network Multimedia MultimediaWidgets)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Network Multimedia MultimediaWidgets)
 
 # OpenCV
 set(OpenCV_DIR "C:/opencv_mingw/x64/mingw/lib")
@@ -34,6 +34,8 @@ qt_add_executable(SignLearnClient
     network/ProtocolHandler.cpp
     network/TcpClient.h
     network/TcpClient.cpp
+    widgets/VideoPlayer.h
+    widgets/VideoPlayer.cpp
     widgets/AppStyle.h
     widgets/LoginWidget.h
     widgets/LoginWidget.cpp
@@ -58,11 +60,14 @@ qt_add_executable(SignLearnClient
     widgets/MainWindow.h
     widgets/MainWindow.cpp
     widgets/MainWindow.ui
+
 )
 
 target_link_libraries(SignLearnClient PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::Network
+    Qt${QT_VERSION_MAJOR}::Multimedia
+    Qt${QT_VERSION_MAJOR}::MultimediaWidgets
     ${OpenCV_LIBS}
 )
 

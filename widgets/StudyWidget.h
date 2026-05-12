@@ -7,6 +7,8 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QImage>
+#include <QKeyEvent>
+#include "VideoPlayer.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class StudyWidget; }
@@ -22,13 +24,15 @@ public:
         QString word;
         QString meaning;
         int     difficulty;
+        QString videoCdnUrl;   // FastAPI 스트리밍 URL
     };
 
     explicit StudyWidget(QWidget *parent = nullptr);
     ~StudyWidget();
 
     void setWordList(const QList<WordInfo> &words);
-    void setDailyGoal(int goal);   // progress bar 최대값을 daily_goal로 설정
+    void setDailyGoal(int goal);
+    VideoPlayer* videoPlayer() const { return m_videoPlayer; }   // progress bar 최대값을 daily_goal로 설정
     void onCameraFrame(const QImage &frame);
     void onKeypointFrame(const QJsonObject &keypoint);
     void showResult(const QString &verdict,
@@ -46,9 +50,13 @@ private slots:
     void onPrevClicked();   // ← 이전 단어
     void onNextClicked();
     void onSkipClicked();
-    void onReplayClicked();
+    void onRecordBtnClicked();   // 녹화 버튼 / 스페이스바
+    void onCountdownTick();        // 카운트다운 타이머
     void onSpeedChanged();
     void onRecordingTimeout();
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override;
 
 private:
     void loadWord(int index);
@@ -59,6 +67,7 @@ private:
     void showCompletionDialog();   // 모든 단어 완료 시 팝업
 
     Ui::StudyWidget *ui;
+    VideoPlayer     *m_videoPlayer = nullptr;
 
     QList<WordInfo> m_words;
     int    m_dailyGoal    = 15;   // 서버에서 받은 목표 단어 수
@@ -68,6 +77,8 @@ private:
 
     QJsonArray    m_keypointBuffer;
     QTimer       *m_stopTimer;
+    QTimer       *m_countdownTimer;   // 3초 카운트다운
+    int            m_countdown = 0;   // 남은 카운트 (3→2→1→0)
     QTimer       *m_cooldownTimer;  // 녹화 종료 후 재시작 방지 (1.5초)
     QButtonGroup *m_speedGroup;
 

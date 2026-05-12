@@ -6,17 +6,14 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QImage>
+#include <QKeyEvent>
+#include <QList>
+#include "VideoPlayer.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class DictWidget; }
 QT_END_NAMESPACE
 
-/**
- * DictWidget — 수화 사전 화면
- *
- * 정방향 탭: 단어 입력 → 300ms 디바운스 → REQ_DICT_SEARCH → 영상+뜻 표시
- * 역방향 탭: 수화 입력 (공수 자세 감지) → REQ_DICT_REVERSE → 단어+뜻 표시
- */
 class DictWidget : public QWidget
 {
     Q_OBJECT
@@ -25,49 +22,63 @@ public:
     explicit DictWidget(QWidget *parent = nullptr);
     ~DictWidget();
 
-    // KeypointClient 슬롯
+    struct DictResult {
+        int     wordId;
+        QString word;
+        QString description;
+        QString videoCdnUrl;
+    };
+
+    // 로그인 후 세션 정보 세팅 — 이후 생성되는 VideoPlayer에 적용됨
+    void setSession(const QString &host, const QString &token)
+    { m_serverHost = host; m_sessionToken = token; }
+
     void onCameraFrame(const QImage &frame);
     void onKeypointFrame(const QJsonObject &keypoint);
 
-    // AppController 응답 처리
-    void showForwardResult(const QString &word,
-                           const QString &description,
-                           const QString &videoCdnUrl);
-    void showReverseResult(const QString &word,
-                           const QString &description);
+    void showForwardResult(const QList<DictResult> &results);
+    void showReverseResult(const QString &word, const QString &description);
     void showSearchError(const QString &message);
 
 signals:
-    // 정방향: 단어 → 영상
     void forwardSearchRequested(const QString &query);
-
-    // 역방향: 수화 → 단어
     void reverseSearchRequested(const QJsonArray &keypoints);
+
+protected:
+    void keyPressEvent(QKeyEvent *event) override;
 
 private slots:
     void onTabForwardClicked();
     void onTabReverseClicked();
-    void onSearchTextChanged(const QString &text);
+    void onBackToListClicked();
     void onSearchBtnClicked();
     void onDebounceTimeout();
     void onRecordingTimeout();
+    void onRecordBtnClicked();
+    void onCountdownTick();
 
 private:
-    void switchTab(int index);   // 0: 정방향, 1: 역방향
+    void switchTab(int index);
+    void clearResults();
+    void showListPage();
+    void showDetailPage(const DictResult &result);
     void startRecording();
     void stopRecording();
 
     Ui::DictWidget *ui;
 
-    // 디바운스 타이머 (정방향)
-    QTimer *m_debounceTimer;
+    QTimer        *m_stopTimer;
+    QTimer        *m_cooldownTimer;
+    QTimer        *m_countdownTimer;
+    int            m_countdown = 0;
+    QElapsedTimer  m_recordingStartTime;
+    bool           m_isRecording = false;
+    QJsonArray     m_keypointBuffer;
 
-    // 공수 자세 감지 (역방향)
-    QTimer       *m_stopTimer;
-    QTimer       *m_cooldownTimer;  // 녹화 종료 후 재시작 방지 (1.5초)
-    QElapsedTimer m_recordingStartTime;
-    bool          m_isRecording  = false;
-    QJsonArray    m_keypointBuffer;
+    QString        m_serverHost;
+    QString        m_sessionToken;
+    int            m_currentTab = 0;
 
-    int m_currentTab = 0;   // 0: 정방향, 1: 역방향
+    QList<VideoPlayer*>  m_resultPlayers;
+    QList<DictResult>    m_currentResults;
 };

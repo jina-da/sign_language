@@ -3,6 +3,7 @@
 
 #include <QButtonGroup>
 #include <QDebug>
+#include <QKeyEvent>
 #include <QJsonArray>
 
 StudyWidget::StudyWidget(QWidget *parent)
@@ -11,14 +12,49 @@ StudyWidget::StudyWidget(QWidget *parent)
     , m_stopTimer(new QTimer(this))
     , m_speedGroup(new QButtonGroup(this))
     , m_cooldownTimer(new QTimer(this))
+    , m_countdownTimer(new QTimer(this))
 {
     ui->setupUi(this);
+
+    // ── videoPlayer QLabel → VideoPlayer 위젯으로 교체 ──
+    m_videoPlayer = new VideoPlayer(this);
+    m_videoPlayer->setMinimumSize(ui->videoPlayer->minimumSize());
+
+    // QLabel을 레이아웃에서 제거하고 VideoPlayer 삽입
+    QLayout *videoLayout = ui->videoPlayer->parentWidget()->layout();
+    if (videoLayout) {
+        int idx = -1;
+        for (int i = 0; i < videoLayout->count(); i++) {
+            if (videoLayout->itemAt(i)->widget() == ui->videoPlayer) {
+                idx = i;
+                break;
+            }
+        }
+        if (idx >= 0) {
+            videoLayout->removeWidget(ui->videoPlayer);
+            ui->videoPlayer->hide();
+            // QVBoxLayout에 같은 위치에 삽입
+            if (auto *vbox = qobject_cast<QVBoxLayout*>(videoLayout)) {
+                vbox->insertWidget(idx, m_videoPlayer);
+            } else {
+                videoLayout->addWidget(m_videoPlayer);
+            }
+        }
+    }
+
+    // VideoPlayer 고정 높이 (cameraView와 동일하게)
+    m_videoPlayer->setFixedHeight(240);
+
+    // 재생 완료 시 다시 보기 버튼 활성화
+    connect(m_videoPlayer, &VideoPlayer::playbackFinished,
+            this, [this]{
+        qDebug() << "[Study] 영상 재생 완료";
+    });
 
     // 버튼들이 스페이스바로 클릭되지 않도록 포커스 정책 제거
     ui->prevBtn->setFocusPolicy(Qt::NoFocus);
     ui->nextBtn->setFocusPolicy(Qt::NoFocus);
     ui->skipBtn->setFocusPolicy(Qt::NoFocus);
-    ui->replayBtn->setFocusPolicy(Qt::NoFocus);
     ui->speed025->setFocusPolicy(Qt::NoFocus);
     ui->speed050->setFocusPolicy(Qt::NoFocus);
     ui->speed100->setFocusPolicy(Qt::NoFocus);
@@ -31,9 +67,14 @@ StudyWidget::StudyWidget(QWidget *parent)
     connect(m_stopTimer, &QTimer::timeout,
             this,        &StudyWidget::onRecordingTimeout);
 
-    // 쿨다운 타이머: 녹화 종료 후 공수 자세가 풀릴 때까지 재시작 방지
+    // 쿨다운 타이머
     m_cooldownTimer->setSingleShot(true);
-    m_cooldownTimer->setInterval(1500);   // 1.5초간 재시작 차단
+    m_cooldownTimer->setInterval(1500);
+
+    // 카운트다운 타이머 (1초 간격)
+    m_countdownTimer->setInterval(1000);
+    connect(m_countdownTimer, &QTimer::timeout,
+            this,             &StudyWidget::onCountdownTick);
 
     // 속도 버튼 그룹
     m_speedGroup->addButton(ui->speed025);
@@ -52,8 +93,9 @@ StudyWidget::StudyWidget(QWidget *parent)
             this,          &StudyWidget::onNextClicked);
     connect(ui->skipBtn,   &QPushButton::clicked,
             this,          &StudyWidget::onSkipClicked);
-    connect(ui->replayBtn, &QPushButton::clicked,
-            this,          &StudyWidget::onReplayClicked);
+    ui->recordBtn->setFixedWidth(110);
+    connect(ui->recordBtn, &QPushButton::clicked,
+            this,          &StudyWidget::onRecordBtnClicked);
 }
 
 StudyWidget::~StudyWidget()
@@ -117,10 +159,15 @@ void StudyWidget::loadWord(int index)
 
     ui->recordingLabel->hide();
     ui->statusLabel->setText(
-        "공수 자세를 취하면 자동으로 녹화가 시작됩니다");
+        "녹화 버튼을 누르거나 스페이스바를 눌러 시작하세요");
 
-    ui->videoPlayer->setText(
-        QString("[%1] 영상 로딩 예정").arg(w.word));
+    // 영상 자동 재생
+    if (!w.videoCdnUrl.isEmpty()) {
+        QString filename = w.videoCdnUrl.split("/").last().split("?").first();
+        m_videoPlayer->setCurrentWordId(w.id);
+        m_videoPlayer->play(w.videoCdnUrl, filename);
+        } else {
+        }
 
     qDebug() << "[Study] 단어 로드:" << w.word
              << "(" << index+1 << "/" << m_words.size() << ")";
@@ -143,22 +190,12 @@ void StudyWidget::onCameraFrame(const QImage &frame)
 // ─────────────────────────────────────────────────────────────
 void StudyWidget::onKeypointFrame(const QJsonObject &keypoint)
 {
-    bool isGongsu = keypoint["is_gongsu"].toBool();
-
-    if (!m_isRecording) {
-        // 쿨다운 중(공수 자세 종료 대기)이면 시작하지 않음
-        if (isGongsu && !m_cooldownTimer->isActive())
-            startRecording();
-        return;
-    }
-
-    if (isGongsu && m_recordingStartTime.elapsed() > 1500) {
-        stopRecording();
-        return;
-    }
+    // 버튼 방식으로 전환 — 녹화 중일 때만 처리
+    if (!m_isRecording) return;
 
     m_keypointBuffer.append(keypoint);
 
+    // 움직임 감지: 손이 보이면 정지 타이머 리셋
     bool hasHand = false;
     for (const auto &joint : keypoint["left_hand"].toArray()) {
         if (joint.toArray()[2].toDouble() > 0.3) { hasHand = true; break; }
@@ -168,10 +205,9 @@ void StudyWidget::onKeypointFrame(const QJsonObject &keypoint)
             if (joint.toArray()[2].toDouble() > 0.3) { hasHand = true; break; }
         }
     }
-
-    if (hasHand)
-        m_stopTimer->start();
+    if (hasHand) m_stopTimer->start();
 }
+
 
 // ─────────────────────────────────────────────────────────────
 // startRecording
@@ -185,7 +221,9 @@ void StudyWidget::startRecording()
     m_recordingStartTime.start();
 
     ui->recordingLabel->show();
-    ui->statusLabel->setText("녹화 중... 수화를 입력하고 공수 자세로 종료하세요.");
+    ui->recordBtn->setText("■ 중단");
+    ui->recordBtn->setStyleSheet("QPushButton { background: #E24B4A; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
+    ui->statusLabel->setText("녹화 중... 수화를 입력하세요. 움직임이 멈추면 자동 종료됩니다.");
 
     qDebug() << "[Study] 녹화 시작";
 }
@@ -198,9 +236,9 @@ void StudyWidget::stopRecording()
     if (!m_isRecording) return;
     m_isRecording = false;
     m_stopTimer->stop();
-    m_cooldownTimer->start();   // 공수 자세 완전히 풀릴 때까지 대기
-
     ui->recordingLabel->hide();
+    ui->recordBtn->setText("⏺ 녹화");
+    ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
 
     int frameCount = m_keypointBuffer.size();
     qDebug() << "[Study] 녹화 종료, 누적 프레임:" << frameCount;
@@ -375,9 +413,66 @@ void StudyWidget::onSkipClicked()
     loadWord(m_currentIndex);
 }
 
-void StudyWidget::onReplayClicked()
+void StudyWidget::keyPressEvent(QKeyEvent *event)
 {
-    qDebug() << "[Study] 영상 다시 보기 (VideoPlayer 연동 예정)";
+    if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
+        onRecordBtnClicked();
+        return;
+    }
+    QWidget::keyPressEvent(event);
+}
+
+void StudyWidget::onRecordBtnClicked()
+{
+    if (m_countdownTimer->isActive()) {
+        // 카운트다운 중 취소
+        m_countdownTimer->stop();
+        m_countdown = 0;
+        ui->countdownLabel->hide();
+        ui->countdownLabel->setText("");
+        ui->statusLabel->setText("녹화가 취소됐습니다.");
+        ui->recordBtn->setText("⏺ 녹화");
+        ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
+        return;
+    }
+
+    if (m_isRecording) {
+        // 녹화 중 → 중단 (전송 안 함)
+        m_isRecording = false;
+        m_stopTimer->stop();
+        m_keypointBuffer = QJsonArray();
+        ui->recordingLabel->hide();
+        ui->countdownLabel->hide();
+        ui->recordBtn->setText("⏺ 녹화");
+        ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
+        ui->statusLabel->setText("녹화가 중단됐습니다. 다시 시작하려면 버튼을 누르세요.");
+        qDebug() << "[Study] 녹화 중단 (전송 안 함)";
+        return;
+    }
+
+    // 카운트다운 시작
+    m_countdown = 3;
+    ui->countdownLabel->setText(QString::number(m_countdown));
+    ui->countdownLabel->show();
+    ui->statusLabel->setText("잠시 후 녹화가 시작됩니다...");
+    ui->recordBtn->setText("■ 취소");
+    ui->recordBtn->setStyleSheet("QPushButton { background: #E24B4A; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
+    m_countdownTimer->start();
+    qDebug() << "[Study] 카운트다운 시작";
+}
+
+void StudyWidget::onCountdownTick()
+{
+    m_countdown--;
+    if (m_countdown > 0) {
+        ui->countdownLabel->setText(QString::number(m_countdown));
+    } else {
+        // 카운트다운 완료 → 녹화 시작
+        m_countdownTimer->stop();
+        ui->countdownLabel->hide();
+        ui->countdownLabel->setText("");
+        startRecording();
+    }
 }
 
 void StudyWidget::onSpeedChanged()
@@ -392,6 +487,7 @@ void StudyWidget::onSpeedChanged()
     auto *btn = qobject_cast<QPushButton*>(m_speedGroup->checkedButton());
     if (btn && speedMap.contains(btn)) {
         m_playSpeed = speedMap[btn];
+        m_videoPlayer->setSpeed(m_playSpeed);
         qDebug() << "[Study] 재생 속도:" << m_playSpeed;
     }
 }

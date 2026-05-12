@@ -2,6 +2,7 @@
 #include "ui_TestWidget.h"
 
 #include <QDebug>
+#include <QKeyEvent>
 #include <QJsonArray>
 
 TestWidget::TestWidget(QWidget *parent)
@@ -10,12 +11,12 @@ TestWidget::TestWidget(QWidget *parent)
     , m_speedGroup(new QButtonGroup(this))
     , m_stopTimer(new QTimer(this))
     , m_cooldownTimer(new QTimer(this))
+    , m_countdownTimer(new QTimer(this))
 {
     ui->setupUi(this);
 
     ui->nextBtn->setFocusPolicy(Qt::NoFocus);
     ui->homeBtn->setFocusPolicy(Qt::NoFocus);
-    ui->replayBtn->setFocusPolicy(Qt::NoFocus);
     ui->speed025->setFocusPolicy(Qt::NoFocus);
     ui->speed050->setFocusPolicy(Qt::NoFocus);
     ui->speed100->setFocusPolicy(Qt::NoFocus);
@@ -40,7 +41,12 @@ TestWidget::TestWidget(QWidget *parent)
 
     // 쿨다운 타이머: 녹화 종료 후 공수 자세가 풀릴 때까지 재시작 방지
     m_cooldownTimer->setSingleShot(true);
-    m_cooldownTimer->setInterval(1500);   // 1.5초간 재시작 차단
+    m_cooldownTimer->setInterval(1500);
+
+    // 카운트다운 타이머
+    m_countdownTimer->setInterval(1000);
+    connect(m_countdownTimer, &QTimer::timeout,
+            this,             &TestWidget::onCountdownTick);
 
     connect(ui->nextBtn,        &QPushButton::clicked,
             this,               &TestWidget::onNextClicked);
@@ -48,8 +54,9 @@ TestWidget::TestWidget(QWidget *parent)
             this,               &TestWidget::onHomeClicked);
     connect(ui->summaryHomeBtn, &QPushButton::clicked,
             this,               &TestWidget::onHomeClicked);
-    connect(ui->replayBtn,      &QPushButton::clicked,
-            this,               &TestWidget::onReplayClicked);
+        ui->recordBtn->setFixedWidth(110);
+    connect(ui->recordBtn, &QPushButton::clicked,
+            this,          &TestWidget::onRecordBtnClicked);
 
     ui->pageStack->setCurrentWidget(ui->testPage);
 }
@@ -128,19 +135,7 @@ void TestWidget::onCameraFrame(const QImage &frame)
 // ─────────────────────────────────────────────────────────────
 void TestWidget::onKeypointFrame(const QJsonObject &keypoint)
 {
-    bool isGongsu = keypoint["is_gongsu"].toBool();
-
-    if (!m_isRecording) {
-        // 쿨다운 중(공수 자세 종료 대기)이면 시작하지 않음
-        if (isGongsu && !m_cooldownTimer->isActive())
-            startRecording();
-        return;
-    }
-
-    if (isGongsu && m_recordingStartTime.elapsed() > 1500) {
-        stopRecording();
-        return;
-    }
+    if (!m_isRecording) return;
 
     m_keypointBuffer.append(keypoint);
 
@@ -167,7 +162,9 @@ void TestWidget::startRecording()
     m_recordingStartTime.start();
 
     ui->recordingLabel->show();
-    ui->statusLabel->setText("녹화 중... 수화를 입력하고 공수 자세로 종료하세요.");
+    ui->recordBtn->setText("■ 중단");
+    ui->recordBtn->setStyleSheet("QPushButton { background: #E24B4A; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
+    ui->statusLabel->setText("녹화 중... 수화를 입력하세요. 움직임이 멈추면 자동 종료됩니다.");
     qDebug() << "[Test] 녹화 시작";
 }
 
@@ -179,8 +176,9 @@ void TestWidget::stopRecording()
     if (!m_isRecording) return;
     m_isRecording = false;
     m_stopTimer->stop();
-    m_cooldownTimer->start();   // 공수 자세 완전히 풀릴 때까지 대기
     ui->recordingLabel->hide();
+    ui->recordBtn->setText("⏺ 녹화");
+    ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
 
     int frameCount = m_keypointBuffer.size();
     qDebug() << "[Test] 녹화 종료, 프레임:" << frameCount;
@@ -197,6 +195,50 @@ void TestWidget::stopRecording()
     emit keypointReady(w.id, false, m_keypointBuffer);
 }
 
+
+void TestWidget::keyPressEvent(QKeyEvent *event)
+{
+    if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
+        onRecordBtnClicked(); return;
+    }
+    QWidget::keyPressEvent(event);
+}
+
+void TestWidget::onRecordBtnClicked()
+{
+    if (m_countdownTimer->isActive()) {
+        m_countdownTimer->stop(); m_countdown = 0;
+        ui->statusLabel->setText("녹화가 취소됐습니다.");
+        ui->recordBtn->setText("⏺ 녹화");
+    ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
+        return;
+    }
+    if (m_isRecording) {
+        m_isRecording = false; m_stopTimer->stop();
+        m_keypointBuffer = QJsonArray();
+        ui->recordingLabel->hide();
+        ui->recordBtn->setText("⏺ 녹화");
+    ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
+        ui->statusLabel->setText("녹화가 중단됐습니다.");
+        qDebug() << "[Test] 녹화 중단";
+        return;
+    }
+    m_countdown = 3;
+    ui->statusLabel->setText("3초 후 녹화 시작...");
+    ui->recordBtn->setText("■ 취소");
+    m_countdownTimer->start();
+    qDebug() << "[Test] 카운트다운 시작";
+}
+
+void TestWidget::onCountdownTick()
+{
+    m_countdown--;
+    ui->statusLabel->setText(QString("%1초 후 녹화 시작...").arg(m_countdown));
+    if (m_countdown <= 0) {
+        m_countdownTimer->stop();
+        startRecording();
+    }
+}
 void TestWidget::onRecordingTimeout()
 {
     stopRecording();

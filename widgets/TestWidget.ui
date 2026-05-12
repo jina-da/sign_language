@@ -200,6 +200,7 @@ QLabel#summaryDetail { font-size: 15px; color: #5F5E5A; }</string>
              <widget class="QLabel" name="recordingLabel">
               <property name="text"><string>● 녹화 중</string></property>
               <property name="visible"><bool>false</bool></property>
+              <property name="styleSheet"><string>font-size:13px; color:#E24B4A; font-weight:500;</string></property>
              </widget>
             </item>
             <item>
@@ -212,6 +213,14 @@ QLabel#summaryDetail { font-size: 15px; color: #5F5E5A; }</string>
               <property name="orientation"><enum>Qt::Horizontal</enum></property>
               <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
              </spacer>
+            </item>
+            <item>
+             <widget class="QPushButton" name="recordBtn">
+              <property name="text"><string>⏺ 녹화</string></property>
+              <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+              <property name="focusPolicy"><enum>Qt::NoFocus</enum></property>
+              <property name="styleSheet"><string>QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; } QPushButton:hover { background: #27500A; }</string></property>
+             </widget>
             </item>
            </layout>
           </item>
