@@ -14,7 +14,7 @@ import torch
 from pathlib import Path
 from datetime import datetime
 
-from model import build_gru_model  # ✅ GRU로 변경
+from model import build_gru_model
 
 # ── 설정 ───────────────────────────────────────────────
 HOST        = "0.0.0.0"
@@ -24,7 +24,7 @@ LABELS_PATH = Path("data/processed/labels.npy")
 NUM_CLASSES = 1000
 DEVICE      = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# 운용서버 프로토콜 타입명
+# 프로토콜 타입명
 REQ_AI_INFER = "REQ_AI_INFER"
 RES_AI_INFER = "RES_AI_INFER"
 REQ_RELOAD   = "REQ_MODEL_DEPLOY"  # NO.604
@@ -55,7 +55,7 @@ class AIServer:
         """
         print(f"[{now()}] 모델 로드 중... ({DEVICE})")
 
-        model = build_gru_model(NUM_CLASSES).to(DEVICE)  # ✅ GRU
+        model = build_gru_model(NUM_CLASSES).to(DEVICE)
         checkpoint = torch.load(model_path, map_location=DEVICE)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
@@ -72,7 +72,7 @@ class AIServer:
         """
         print(f"[{now()}] 모델 교체 시작...")
 
-        new_model = build_gru_model(NUM_CLASSES).to(DEVICE)  # ✅ GRU
+        new_model = build_gru_model(NUM_CLASSES).to(DEVICE)
         checkpoint = torch.load(model_path, map_location=DEVICE)
         new_model.load_state_dict(checkpoint['model_state_dict'])
         new_model.eval()
@@ -81,37 +81,90 @@ class AIServer:
             self.model = new_model
             print(f"[{now()}] 모델 교체 완료 (val_acc: {checkpoint['val_acc']:.4f})")
 
+    def _parse_frames(self, frames: list) -> np.ndarray:
+        """
+        운용서버에서 받은 딕셔너리 형태 frames → (T, 134) numpy array 변환
+        입력 형태:
+        [{ "frame_idx": 0, "is_gongsu": false,
+            "pose": [[x,y,c], ...],        # 25개 관절 (픽셀값)
+            "left_hand": [[x,y,c], ...],   # 21개 관절 (픽셀값)
+            "right_hand": [[x,y,c], ...],  # 21개 관절 (픽셀값)
+        }, ...]
+        출력: (T, 134) float32
+        pose 25×2 + left_hand 21×2 + right_hand 21×2 = 134차원
+        픽셀값 → /1920, /1080 정규화 (학습 데이터와 동일한 방식)
+        """
+        IMG_W = 1920.0
+        IMG_H = 1080.0
+
+        result = []
+        for frame in frames:
+            # is_gongsu=true 프레임 제외
+            if frame.get("is_gongsu", False):
+                continue
+
+            # x는 /1920, y는 /1080 정규화 (학습 데이터와 동일)
+            pose = [
+                joint[0] / IMG_W if j == 0 else joint[1] / IMG_H
+                for joint in frame.get("pose", [])
+                for j in range(2)
+            ]
+            left_hand = [
+                joint[0] / IMG_W if j == 0 else joint[1] / IMG_H
+                for joint in frame.get("left_hand", [])
+                for j in range(2)
+            ]
+            right_hand = [
+                joint[0] / IMG_W if j == 0 else joint[1] / IMG_H
+                for joint in frame.get("right_hand", [])
+                for j in range(2)
+            ]
+
+            flat = pose + left_hand + right_hand  # 134차원
+
+            if len(flat) != 134:
+                print(f"[{now()}] 프레임 차원 오류: {len(flat)} → 스킵")
+                continue
+
+            result.append(flat)
+
+        if not result:
+            raise ValueError("유효한 프레임 없음 (is_gongsu 제외 후 0개)")
+
+        return np.array(result, dtype=np.float32)
+
     @torch.no_grad()
     def infer(self, frames: list) -> dict:
         """
         keypoint 시퀀스 추론
-        frames: [[x, y, ...] × T프레임] 형태 (T, 134)
-        반환: {predicted_word_id, confidence} — DB id 기준 (클래스 인덱스 + 1)
+        frames: 운용서버에서 받은 딕셔너리 형태 프레임 리스트
+        반환: {predicted_word_id, confidence, inference_ms}
+              predicted_word_id: DB id 기준 (클래스 인덱스 + 1)
         """
         t0 = time.monotonic()
 
-        # numpy → tensor 변환
-        seq = np.array(frames, dtype=np.float32)      # (T, 134)
-        x   = torch.tensor(seq).unsqueeze(0).to(DEVICE)  # (1, T, 134)
+        # 딕셔너리 frames → (T, 134) numpy array 변환
+        seq = self._parse_frames(frames)                      # (T, 134)
+        x   = torch.tensor(seq).unsqueeze(0).to(DEVICE)      # (1, T, 134)
 
-        # padding_mask 없음 (단일 시퀀스, 패딩 불필요)
+        # padding_mask: 단일 시퀀스라 패딩 없음
         padding_mask = torch.zeros(1, x.shape[1], dtype=torch.bool).to(DEVICE)
 
         # 추론
-        logits     = self.model(x, padding_mask)       # (1, 1000)
-        probs      = torch.softmax(logits, dim=1)
+        logits               = self.model(x, padding_mask)   # (1, 1000)
+        probs                = torch.softmax(logits, dim=1)
         confidence, pred_idx = probs.max(dim=1)
 
         class_idx         = int(pred_idx.item())
-        predicted_word_id = class_idx + 1              # ✅ 클래스 인덱스 → DB id 변환
+        predicted_word_id = class_idx + 1                    # 클래스 인덱스 → DB id (+1)
         conf              = float(confidence.item())
         inference_ms      = int((time.monotonic() - t0) * 1000)
 
-        word_name = str(self.labels[class_idx])        # 로그용
+        word_name = str(self.labels[class_idx])              # 로그용
         print(f"[{now()}] 추론: {word_name} (word_id={predicted_word_id}, confidence={conf:.4f}, {inference_ms}ms)")
 
         return {
-            "predicted_word_id": predicted_word_id,    # ✅ DB id (1~1000)
+            "predicted_word_id": predicted_word_id,          # DB id (1~1000)
             "confidence":        round(conf, 4),
             "inference_ms":      inference_ms,
         }
@@ -141,17 +194,30 @@ class AIServer:
                     # 추론 요청 (NO.501)
                     frames = data.get('frames')
                     if not frames:
-                        response = {"type": RES_AI_INFER, "request_id": request_id, "error": "frames 없음"}
-                    else:
-                        async with self.lock:
-                            result = self.infer(frames)
                         response = {
-                            "type":              RES_AI_INFER,
-                            "request_id":        request_id,   # ✅ 운용서버 매칭용
-                            "predicted_word_id": result["predicted_word_id"],
-                            "confidence":        result["confidence"],
-                            "inference_ms":      result["inference_ms"],
+                            "type":       RES_AI_INFER,
+                            "request_id": request_id,
+                            "error":      "frames 없음"
                         }
+                    else:
+                        try:
+                            async with self.lock:
+                                result = self.infer(frames)
+                            response = {
+                                "type":              RES_AI_INFER,
+                                "request_id":        request_id,    # 운용서버 요청-응답 매칭용
+                                "predicted_word_id": result["predicted_word_id"],
+                                "confidence":        result["confidence"],
+                                "inference_ms":      result["inference_ms"],
+                            }
+                        except ValueError as e:
+                            # 유효한 프레임 없음 등 파싱 오류
+                            print(f"[{now()}] 추론 실패: {e}")
+                            response = {
+                                "type":       RES_AI_INFER,
+                                "request_id": request_id,
+                                "error":      str(e)
+                            }
 
                 elif req_type == REQ_RELOAD:
                     # 모델 교체 요청 (NO.604)
