@@ -27,14 +27,12 @@ ai_server/
 ├── .gitignore
 ├── data/
 │   ├── models/
-│   │   ├── best_model.pt       # 현재 서비스 중인 모델 (v5, test_acc 91.48%)
+│   │   ├── best_model.pt       # 현재 서비스 중인 모델 (v7, test_acc 93.69%)
 │   │   └── backup/             # 이전 버전 모델 백업
 │   ├── processed/
 │   │   ├── sequences.npy       # 전처리된 keypoint 시퀀스 (15,837개)
 │   │   ├── label_indices.npy   # 클래스 인덱스 (0~999)
 │   │   ├── labels.npy          # 단어명 배열
-│   │   ├── train_mean.npy      # 학습 데이터 평균 (분포 보정용)
-│   │   └── train_std.npy       # 학습 데이터 표준편차 (분포 보정용)
 │   └── syn_단어목록.csv         # SYN 1,000단어 목록 (난이도 포함)
 └── data/raw/                   # AI Hub 원본 데이터 (Git 제외)
 ```
@@ -48,23 +46,24 @@ ai_server/
 | 항목 | 값 |
 |------|-----|
 | 아키텍처 | Bidirectional GRU |
-| 입력 차원 | 134 (pose 25×2 + left_hand 21×2 + right_hand 21×2) |
+| 입력 차원 | 268 (좌표 134 + 차분 134) |
 | Hidden dim | 512 |
 | 레이어 수 | 3 |
 | 분류 클래스 | 1,000단어 |
 | Dropout | 0.4 |
-| 최종 test accuracy | **91.48%** |
+| 최종 test accuracy | **93.69%** |
 
 ### 입력 형식
 
-클라이언트가 MediaPipe로 추출한 keypoint를 픽셀값으로 변환 후 `/1920, /1080` 정규화:
+클라이언트가 MediaPipe로 추출한 keypoint를 픽셀값으로 변환 후 `/1920, /1080` 정규화.
+관절 순서는 OpenPose 기준 학습 데이터를 MediaPipe 순서로 재배열하여 일치시킴.
+동작 변화량 파악을 위해 좌표와 차분(프레임 간 변화량)을 합쳐 입력:
 
 ```
-pose      : 25개 관절 × 2(x, y) = 50차원
-left_hand : 21개 관절 × 2(x, y) = 42차원
-right_hand: 21개 관절 × 2(x, y) = 42차원
-────────────────────────────────────────
-합계      : 134차원
+좌표: pose 25×2 + left_hand 21×2 + right_hand 21×2 = 134차원
+차분: 직전 프레임 대비 변화량                       = 134차원
+────────────────────────────────────────────────────
+합계: 268차원
 ```
 
 ### Transformer 모델 (사용 안 함)
@@ -81,7 +80,9 @@ right_hand: 21개 관절 × 2(x, y) = 42차원
 | v2 | epoch=100 | 85.73% |
 | v3 | 증강(×5배) + dropout=0.4 + factor=0.5 | 89.96% |
 | v4 | 증강 + dropout=0.4 + factor=0.7 | 91.29% |
-| **v5** | 증강 + hidden_dim=512 + dropout=0.4 | **91.48%** |
+| v5 | 증강 + hidden_dim=512 + dropout=0.4 | 91.48% |
+| v6 | pose 관절 순서 OpenPose→MediaPipe 매핑 | 93.18% |
+| **v7** | 차분(delta) 추가 — 동작 변화량 학습 | **93.69%** |
 
 ### 데이터 증강 방법
 
@@ -123,7 +124,7 @@ right_hand: 21개 관절 × 2(x, y) = 42차원
   "frames": [
     {
       "frame_idx": 0,
-      "is_gongsu": false,
+      
       "pose":       [[x, y, visibility], ...],
       "left_hand":  [[x, y, z], ...],
       "right_hand": [[x, y, z], ...]
@@ -262,12 +263,13 @@ python3 retrain.py
 → 낮음 (OpenPose vs MediaPipe 분포 차이 가능성)
 ```
 
-**해결 시도:**
-- 카메라 해상도 640×480 → 1920×1080 수정
-- 학습 데이터 통계(평균/표준편차) 기반 분포 보정 적용
-- SYN 영상 MediaPipe 재전처리 시도 → 아바타 특성상 검출 정확도 낮아 보류
-
-**근본 해결책**: REAL mp4 원천 영상을 MediaPipe로 재전처리 필요 (용량 문제로 보류)
+**해결 과정:**
+1. 카메라 해상도 640×480 → 1920×1080 통일 → 효과 미미
+2. 학습 데이터 통계 기반 분포 보정 시도 → 효과 미미
+3. **pose 관절 순서 불일치 발견** — OpenPose(0:Nose, 1:Neck, 2:RShoulder...)와 MediaPipe(0:Nose, 1:Left eye inner, 2:Left eye...) 순서가 달라 모델이 엉뚱한 관절로 추론하고 있었음
+4. OpenPose → MediaPipe 관절 순서 매핑 적용 후 재전처리 + 재학습 → **test_acc 91.48% → 93.18%**
+5. 차분(프레임 간 변화량) 추가로 동작 패턴 학습 강화 → **93.69%**
+6. 실제 서비스 테스트에서 정답 출력 확인
 
 ### Transformer 모델 학습 실패
 
