@@ -60,7 +60,7 @@ def extract_keypoints(frame_path: Path) -> np.ndarray:
         xs = coords[0::3]  # confidence 제외
         ys = coords[1::3]
         for x, y in zip(xs, ys):
-            result.extend([x / IMG_W, y / IMG_H])  # 0~1 정규화
+            result.extend([x / IMG_W, y / IMG_H])
 
     return np.array(result, dtype=np.float32)
 
