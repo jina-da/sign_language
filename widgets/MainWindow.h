@@ -4,6 +4,7 @@
 #include <QList>
 #include <QMenu>
 #include <QPushButton>
+#include <QProcess>
 #include "StudyWidget.h"
 #include "ReviewWidget.h"
 #include "DictWidget.h"
@@ -67,4 +68,9 @@ private:
     QString m_username;
     int m_todayDone = 0;
     int m_todayGoal = 15;
+
+    QProcess *m_keypointProcess = nullptr;
+    bool      m_kpServerReady   = false;
+    void startKeypointServer();
+    void scheduleConnectFallback();  // Python 준비 신호 없을 때 10초 후 강제 연결
 };

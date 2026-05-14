@@ -76,6 +76,8 @@ private:
     double m_playSpeed    = 1.0;
 
     QJsonArray    m_keypointBuffer;
+    QJsonObject   m_prevKeypoint;
+    bool          m_hasPrevKeypoint = false;
     QTimer       *m_stopTimer;
     QTimer       *m_cooldownTimer;
     QTimer       *m_countdownTimer;

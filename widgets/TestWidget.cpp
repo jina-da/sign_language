@@ -33,6 +33,10 @@ TestWidget::TestWidget(QWidget *parent)
     connect(m_speedGroup, &QButtonGroup::buttonClicked,
             this,         &TestWidget::onSpeedChanged);
 
+
+    // resultCard 초기 숨김
+    ui->resultCard->setVisible(false);
+
     // 1.5초 정지 감지 타이머 (StudyWidget과 동일)
     m_stopTimer->setSingleShot(true);
     m_stopTimer->setInterval(1500);
@@ -103,15 +107,21 @@ void TestWidget::loadWord(int index)
 
     updateProgress();
 
-    ui->resultCard->hide();
+    ui->resultCard->setVisible(false);
     ui->nextBtn->setEnabled(false);
     ui->nextBtn->setText("다음 →");
 
-    m_isRecording    = false;
-    m_keypointBuffer = QJsonArray();
+    m_isRecording     = false;
+    m_keypointBuffer  = QJsonArray();
+    m_hasPrevKeypoint = false;
     m_stopTimer->stop();
+    m_countdownTimer->stop();
+    m_cooldownTimer->stop();
+    m_countdown = 0;
 
     ui->recordingLabel->hide();
+    ui->recordBtn->setText("● 녹화");
+    ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
     ui->statusLabel->setText("공수 자세를 취하면 자동으로 녹화가 시작됩니다");
 
     qDebug() << "[Test] 문제 로드:" << w.meaning
@@ -139,16 +149,29 @@ void TestWidget::onKeypointFrame(const QJsonObject &keypoint)
 
     m_keypointBuffer.append(keypoint);
 
-    bool hasHand = false;
-    for (const auto &joint : keypoint["left_hand"].toArray()) {
-        if (joint.toArray()[2].toDouble() > 0.3) { hasHand = true; break; }
+    static constexpr double MOTION_THRESHOLD = 19.2; // 픽셀 기준 (1920x1080 해상도, 약 1%)
+    auto wrist = [](const QJsonObject &kp, const QString &side) -> QPointF {
+        const QJsonArray hand = kp[side].toArray();
+        if (hand.isEmpty()) return {};
+        const QJsonArray w = hand[0].toArray();
+        return { w[0].toDouble(), w[1].toDouble() };
+    };
+
+    bool moving = false;
+    if (m_hasPrevKeypoint) {
+        auto nonZero = [](QPointF p){ return p.x() != 0.0 || p.y() != 0.0; };
+        QPointF lC = wrist(keypoint, "left_hand"),  lP = wrist(m_prevKeypoint, "left_hand");
+        QPointF rC = wrist(keypoint, "right_hand"), rP = wrist(m_prevKeypoint, "right_hand");
+        if (nonZero(lC) && nonZero(lP) && qAbs(lC.x()-lP.x())+qAbs(lC.y()-lP.y()) >= MOTION_THRESHOLD) moving = true;
+        if (!moving && nonZero(rC) && nonZero(rP) && qAbs(rC.x()-rP.x())+qAbs(rC.y()-rP.y()) >= MOTION_THRESHOLD) moving = true;
     }
-    if (!hasHand) {
-        for (const auto &joint : keypoint["right_hand"].toArray()) {
-            if (joint.toArray()[2].toDouble() > 0.3) { hasHand = true; break; }
-        }
-    }
-    if (hasHand) m_stopTimer->start();
+    m_prevKeypoint    = keypoint;
+    m_hasPrevKeypoint = true;
+
+    if (moving)
+        m_stopTimer->start();
+    else if (!m_stopTimer->isActive())
+        m_stopTimer->start();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -157,14 +180,15 @@ void TestWidget::onKeypointFrame(const QJsonObject &keypoint)
 void TestWidget::startRecording()
 {
     if (m_isRecording) return;
-    m_isRecording    = true;
-    m_keypointBuffer = QJsonArray();
+    m_isRecording       = true;
+    m_keypointBuffer    = QJsonArray();
+    m_hasPrevKeypoint   = false;
     m_recordingStartTime.start();
 
     ui->recordingLabel->show();
     ui->recordBtn->setText("■ 중단");
     ui->recordBtn->setStyleSheet("QPushButton { background: #E24B4A; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
-    ui->statusLabel->setText("녹화 중... 수화를 입력하세요. 움직임이 멈추면 자동 종료됩니다.");
+    ui->statusLabel->setText("녹화 중... 수화를 입력하세요.\n움직임이 멈추면 자동 종료됩니다.");
     qDebug() << "[Test] 녹화 시작";
 }
 
@@ -177,7 +201,7 @@ void TestWidget::stopRecording()
     m_isRecording = false;
     m_stopTimer->stop();
     ui->recordingLabel->hide();
-    ui->recordBtn->setText("⏺ 녹화");
+    ui->recordBtn->setText("● 녹화");
     ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
 
     int frameCount = m_keypointBuffer.size();
@@ -206,10 +230,10 @@ void TestWidget::keyPressEvent(QKeyEvent *event)
 
 void TestWidget::onRecordBtnClicked()
 {
-    if (m_countdownTimer->isActive()) {
+    if (m_countdownTimer->isActive() && m_countdown > 0) {
         m_countdownTimer->stop(); m_countdown = 0;
         ui->statusLabel->setText("녹화가 취소됐습니다.");
-        ui->recordBtn->setText("⏺ 녹화");
+        ui->recordBtn->setText("● 녹화");
     ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
         return;
     }
@@ -217,7 +241,7 @@ void TestWidget::onRecordBtnClicked()
         m_isRecording = false; m_stopTimer->stop();
         m_keypointBuffer = QJsonArray();
         ui->recordingLabel->hide();
-        ui->recordBtn->setText("⏺ 녹화");
+        ui->recordBtn->setText("● 녹화");
     ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
         ui->statusLabel->setText("녹화가 중단됐습니다.");
         qDebug() << "[Test] 녹화 중단";
@@ -255,7 +279,7 @@ void TestWidget::showResult(bool isCorrect, double accuracy, int wordId)
     ui->answerLabel->show();
 
     // 결과 카드 표시
-    ui->resultCard->show();
+    ui->resultCard->setVisible(true);
     ui->confidenceLabel->setText(
         QString("신뢰도: %1%").arg(accuracy * 100.0, 0, 'f', 1));
 

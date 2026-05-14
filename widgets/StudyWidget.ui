@@ -130,7 +130,7 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }</string>
      </property>
      <item>
       <widget class="QWidget" name="videoArea">
-       <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Expanding"><horstretch>1</horstretch><verstretch>0</verstretch></sizepolicy></property>
+       <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Preferred"><horstretch>1</horstretch><verstretch>0</verstretch></sizepolicy></property>
        <layout class="QVBoxLayout" name="videoLayout">
        <property name="spacing">
         <number>12</number>
@@ -310,7 +310,7 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }</string>
      </item>
      <item>
       <widget class="QWidget" name="cameraArea">
-       <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Expanding"><horstretch>1</horstretch><verstretch>0</verstretch></sizepolicy></property>
+       <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Preferred"><horstretch>1</horstretch><verstretch>0</verstretch></sizepolicy></property>
        <layout class="QVBoxLayout" name="cameraLayout">
        <property name="spacing">
         <number>12</number>
@@ -350,19 +350,26 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }</string>
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="recordBtn">
-         <property name="cursor">
-          <cursorShape>PointingHandCursor</cursorShape>
+        <layout class="QHBoxLayout" name="recordRow" >
+         <property name="spacing">
+          <number>8</number>
          </property>
-         <property name="focusPolicy">
-          <enum>Qt::FocusPolicy::NoFocus</enum>
-         </property>
-         <property name="text">
-          <string>⏺ 녹화</string>
-         </property>
-        </widget>
+         <item>
+          <widget class="QPushButton" name="recordBtn">
+           <property name="cursor">
+            <cursorShape>PointingHandCursor</cursorShape>
+           </property>
+           <property name="focusPolicy">
+            <enum>Qt::FocusPolicy::NoFocus</enum>
+           </property>
+           <property name="text">
+            <string>● 녹화</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
-       <item>
+<item>
         <layout class="QHBoxLayout" name="statusRow">
          <item>
           <widget class="QLabel" name="recordingLabel">
@@ -373,14 +380,17 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }</string>
             <string>font-size:13px; color:#E24B4A; font-weight:500;</string>
            </property>
            <property name="text">
-            <string>● 녹화 중</string>
+            <string>▶ 녹화 중</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QLabel" name="countdownLabel">
-           <property name="visible">
-            <bool>false</bool>
+           <property name="minimumSize">
+            <size><width>24</width><height>0</height></size>
+           </property>
+           <property name="maximumSize">
+            <size><width>24</width><height>16777215</height></size>
            </property>
            <property name="text">
             <string/>
@@ -410,11 +420,11 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }</string>
            </property>
           </spacer>
          </item>
-        </layout>
+                </layout>
        </item>
        <item>
         <widget class="QWidget" name="resultCard">
-         <property name="visible"><bool>false</bool></property>
+         <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
          <layout class="QVBoxLayout" name="resultLayout">
          <property name="spacing">
           <number>6</number>
@@ -464,19 +474,6 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }</string>
          </item>
         </layout>
         </widget>
-       </item>
-       <item>
-        <spacer>
-         <property name="orientation">
-          <enum>Qt::Orientation::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
        </item>
        <item>
         <layout class="QHBoxLayout" name="btnRow">

@@ -42,24 +42,29 @@ signals:
 private slots:
     void onFrameReadyRead();
     void onKeypointReadyRead();
-    void onDisconnected();
+    void onDataSocketDisconnected();   // frame/keypoint 소켓 전용
+    void onControlDisconnected();      // control 소켓 전용
     void tryReconnect();
 
 private:
     void processBuffer(QByteArray &buffer, bool isFrame);
+    void checkAndEmitConnected();      // 두 데이터 소켓 모두 연결됐는지 확인
 
     QTcpSocket *m_frameSocket;
     QTcpSocket *m_keypointSocket;
-    QTcpSocket *m_controlSocket;   // 우세손 설정 전송용
+    QTcpSocket *m_controlSocket;
     QTimer     *m_reconnectTimer;
 
     QByteArray m_frameBuffer;
     QByteArray m_keypointBuffer;
 
     QString  m_host;
-    bool     m_connected          = false;
-    bool     m_hasPendingDominant = false;
-    bool     m_pendingDominantLeft = false;
+    bool     m_connected             = false;
+    bool     m_frameConnected        = false;   // frameSocket 연결 상태
+    bool     m_keypointConnected     = false;   // keypointSocket 연결 상태
+    bool     m_intentionalDisconnect = false;
+    bool     m_hasPendingDominant    = false;
+    bool     m_pendingDominantLeft   = false;
 
     void sendDominantHand();
 

@@ -11,6 +11,12 @@
 #include "widgets/RegisterWidget.h"
 #include "network/TcpClient.h"
 
+// ─── 서버 접속 정보 ───────────────────────────────────────────
+// IP나 포트를 변경할 때 이 부분만 수정하면 됩니다.
+static constexpr const char* SERVER_HOST = "10.10.10.114";
+static constexpr int         SERVER_PORT = 9000;
+// ─────────────────────────────────────────────────────────────
+
 class AppController : public QObject
 {
     Q_OBJECT

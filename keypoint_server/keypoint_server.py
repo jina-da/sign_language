@@ -5,6 +5,7 @@ keypoint_server.py — MediaPipe 0.10.x Tasks API 수정 버전
 import asyncio
 import json
 import struct
+import sys
 import cv2
 import mediapipe as mp
 from mediapipe.tasks import python as mp_python
@@ -14,13 +15,18 @@ from mediapipe.tasks.python.vision.core.vision_task_running_mode import VisionTa
 import urllib.request
 import os
 
+# stdout 버퍼링 비활성화 — Qt 콘솔에 로그가 즉시 표시되도록
+sys.stdout.reconfigure(encoding='utf-8', line_buffering=True)
+
 # ── 설정 ──────────────────────────────────────────────────────
 FRAME_PORT    = 7000
 KEYPOINT_PORT = 7001
 CONTROL_PORT  = 7002   # Qt → Python 제어 메시지 (우세손 설정 등)
 CAMERA_INDEX  = 0
-FRAME_WIDTH   = 640
-FRAME_HEIGHT  = 480
+FRAME_WIDTH    = 1920   # 캡처 해상도 (키포인트 추출용)
+FRAME_HEIGHT   = 1080
+DISPLAY_WIDTH  = 640    # Qt 화면 전송용 (대역폭 절약)
+DISPLAY_HEIGHT = 360
 JPEG_QUALITY  = 70
 
 # 우세손 설정 (Qt에서 로그인 후 전달)
@@ -84,11 +90,11 @@ async def send_jpeg(writer, frame_bgr):
     await send_packet(writer, jpeg.tobytes())
 
 # ── 관절 추출 헬퍼 ───────────────────────────────────────────
-def extract_hand(hand_landmarks, handedness_list, label):
+def extract_hand(hand_landmarks, handedness_list, label, img_width, img_height):
     for i, h in enumerate(handedness_list):
         # display_name 대신 category_name 사용
         if h[0].category_name == label:
-            return [[lm.x, lm.y, lm.z] for lm in hand_landmarks[i]]
+            return [[lm.x * img_width, lm.y * img_height, lm.z] for lm in hand_landmarks[i]]
     return None  # 감지 안 됨을 None으로 구분
 
 def hand_detected(hand_data):
@@ -99,23 +105,23 @@ def hand_to_list(hand_data):
     """None이면 zeros 반환"""
     return hand_data if hand_data is not None else [[0.0, 0.0, 0.0]] * 21
 
-def extract_pose(pose_landmarks):
+def extract_pose(pose_landmarks, img_width, img_height):
     if not pose_landmarks:
         return [[0.0, 0.0, 0.0]] * 25
-    return [[lm.x, lm.y, lm.visibility] for lm in pose_landmarks[0][:25]]
+    return [[lm.x * img_width, lm.y * img_height, lm.visibility] for lm in pose_landmarks[0][:25]]
 
 # ── 우세손 정규화 ─────────────────────────────────────────────
-def normalize_dominant_hand(left_hand, right_hand):
+def normalize_dominant_hand(left_hand, right_hand, img_width):
     """
-    왼손잡이일 경우: x좌표 반전(1-x) + 왼손↔오른손 채널 swap
+    왼손잡이일 경우: x좌표 반전(img_width - x) + 왼손↔오른손 채널 swap
     오른손잡이: 그대로 반환
     """
     if not is_dominant_left:
         return left_hand, right_hand
 
-    # x좌표 반전
+    # x좌표 반전 (픽셀 기준)
     def flip_x(hand):
-        return [[1.0 - lm[0], lm[1], lm[2]] for lm in hand]
+        return [[img_width - lm[0], lm[1], lm[2]] for lm in hand]
 
     # 채널 swap: 왼손 ↔ 오른손
     return flip_x(right_hand), flip_x(left_hand)
@@ -126,8 +132,8 @@ def is_gongsu_pose(left_hand, right_hand, pose_lms):
     공수 자세: 양손이 몸 중앙에 가까이 모인 상태
     조건:
       1. 양손 모두 감지됨
-      2. 두 손 wrist 간 거리가 가까움 (0.25 이하)
-      3. 손 중앙이 어깨 중앙에서 너무 멀지 않음 (0.4 이하)
+      2. 두 손 wrist 간 거리가 가까움 (픽셀 기준 160px 이하, 640px 폭 기준 25%)
+      3. 손 중앙이 어깨 중앙에서 너무 멀지 않음 (픽셀 기준 192px 이하, 480px 높이 기준 40%)
     """
     if not hand_detected(left_hand) or not hand_detected(right_hand):
         return False
@@ -136,7 +142,7 @@ def is_gongsu_pose(left_hand, right_hand, pose_lms):
     rx, ry = right_hand[0][0], right_hand[0][1]
 
     hand_dist = ((lx - rx) ** 2 + (ly - ry) ** 2) ** 0.5
-    if hand_dist > 0.25:
+    if hand_dist > 480:   # 0.25 * 1920
         return False
 
     cx = (lx + rx) / 2
@@ -145,7 +151,7 @@ def is_gongsu_pose(left_hand, right_hand, pose_lms):
         sx = (pose_lms[11][0] + pose_lms[12][0]) / 2
         sy = (pose_lms[11][1] + pose_lms[12][1]) / 2
         body_dist = ((cx - sx) ** 2 + (cy - sy) ** 2) ** 0.5
-        if body_dist > 0.4:
+        if body_dist > 432:   # 0.4 * 1080
             return False
 
     return True
@@ -154,29 +160,40 @@ def is_gongsu_pose(left_hand, right_hand, pose_lms):
 frame_writers    = []
 keypoint_writers = []
 
+async def _wait_until_disconnected(reader):
+    """
+    클라이언트가 끊길 때까지 대기한다.
+    Qt 클라이언트는 데이터를 보내지 않으므로 EOF(빈 bytes)로 종료를 감지한다.
+    """
+    try:
+        while True:
+            data = await reader.read(1024)
+            if not data:   # EOF — 상대방이 연결을 정상 종료
+                break
+    except Exception:
+        pass   # 강제 종료(abort) 등 예외도 동일하게 처리
+
 async def handle_frame_client(reader, writer):
     addr = writer.get_extra_info("peername")
     print(f"[Frame] Qt 연결: {addr}")
     frame_writers.append(writer)
     try:
-        await reader.read(1024)
-    except:
-        pass
+        await _wait_until_disconnected(reader)
     finally:
         if writer in frame_writers:
             frame_writers.remove(writer)
+        print(f"[Frame] Qt 연결 종료: {addr}")
 
 async def handle_keypoint_client(reader, writer):
     addr = writer.get_extra_info("peername")
     print(f"[Keypoint] Qt 연결: {addr}")
     keypoint_writers.append(writer)
     try:
-        await reader.read(1024)
-    except:
-        pass
+        await _wait_until_disconnected(reader)
     finally:
         if writer in keypoint_writers:
             keypoint_writers.remove(writer)
+        print(f"[Keypoint] Qt 연결 종료: {addr}")
 
 async def handle_control_client(reader, writer):
     """Qt에서 우세손 설정 등 제어 메시지 수신"""
@@ -201,23 +218,53 @@ async def handle_control_client(reader, writer):
 
 # ── 메인 캡처 루프 ────────────────────────────────────────────
 async def capture_loop():
-    cap = cv2.VideoCapture(CAMERA_INDEX)
+    # 카메라 열기 — 다른 프로세스가 점유 중일 수 있으므로 최대 10회 재시도
+    cap = None
+    for attempt in range(10):
+        cap = cv2.VideoCapture(CAMERA_INDEX)
+        if cap.isOpened():
+            break
+        print(f"[Camera] 열기 실패 ({attempt + 1}/10) — 2초 후 재시도...")
+        cap.release()
+        await asyncio.sleep(2.0)
+
+    if cap is None or not cap.isOpened():
+        print("[Camera] 카메라를 열 수 없습니다. 카메라 연결 상태를 확인하세요.")
+        return
+
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  FRAME_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
 
-    if not cap.isOpened():
-        print("[Error] 카메라를 열 수 없습니다.")
-        return
-
-    print("[Camera] 캡처 시작")
-    frame_idx    = 0
-    timestamp_ms = 0
+    # 실제 캡처 해상도 읽기 (설정값과 다를 수 있으므로 cap.get으로 확인)
+    img_width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    img_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    print(f"[Camera] 캡처 시작 — 해상도: {img_width}x{img_height}")
+    frame_idx     = 0
+    timestamp_ms  = 0
+    fail_count    = 0          # 연속 프레임 실패 횟수
+    MAX_FAIL_LOG  = 5          # 이 횟수까지만 WARN 출력
+    FAIL_SLEEP    = 1.0        # 실패 누적 후 대기 시간(초)
+    FAIL_COOLDOWN = 30         # 이 횟수 이상이면 대기 후 재시도
 
     while True:
         ret, frame = cap.read()
         if not ret:
-            await asyncio.sleep(0.01)
+            fail_count += 1
+            if fail_count <= MAX_FAIL_LOG:
+                print(f"[Camera] 프레임 읽기 실패 ({fail_count}회)")
+            elif fail_count == MAX_FAIL_LOG + 1:
+                print(f"[Camera] 프레임 읽기 반복 실패 — 이후 로그 생략, {FAIL_SLEEP}초마다 재시도")
+            # 실패가 누적되면 대기 시간을 늘려 CPU/로그 부담 감소
+            if fail_count >= FAIL_COOLDOWN:
+                await asyncio.sleep(FAIL_SLEEP)
+            else:
+                await asyncio.sleep(0.01)
             continue
+
+        # 프레임 성공 시 실패 카운터 초기화
+        if fail_count > 0:
+            print(f"[Camera] 프레임 복구 (실패 {fail_count}회 후)")
+            fail_count = 0
 
         timestamp_ms += 33
 
@@ -228,19 +275,22 @@ async def capture_loop():
         pose_result = pose_landmarker.detect_for_video(mp_image, timestamp_ms)
 
         left_hand_raw  = extract_hand(hand_result.hand_landmarks,
-                                      hand_result.handedness, "Left")
+                                      hand_result.handedness, "Left",
+                                      img_width, img_height)
         right_hand_raw = extract_hand(hand_result.hand_landmarks,
-                                      hand_result.handedness, "Right")
+                                      hand_result.handedness, "Right",
+                                      img_width, img_height)
 
         # 우세손 정규화
         left_normalized, right_normalized = normalize_dominant_hand(
             hand_to_list(left_hand_raw),
-            hand_to_list(right_hand_raw)
+            hand_to_list(right_hand_raw),
+            img_width
         )
 
         left_hand  = left_normalized
         right_hand = right_normalized
-        pose_lms   = extract_pose(pose_result.pose_landmarks)
+        pose_lms   = extract_pose(pose_result.pose_landmarks, img_width, img_height)
 
         gongsu = is_gongsu_pose(left_hand_raw, right_hand_raw, pose_lms)
 
@@ -271,9 +321,12 @@ async def capture_loop():
                     body_dist = ((cx-sx)**2+(cy-sy)**2)**0.5
                     print(f"  몸중앙거리:{body_dist:.3f} (기준:0.4)")
 
-        # 프레임 전송
+        # 프레임 전송 — 화면 표시용은 전송 대역폭 절약을 위해 리사이즈
+        # 키포인트 추출은 원본(1920x1080) 해상도로 수행됨
+        display_frame = cv2.resize(frame, (DISPLAY_WIDTH, DISPLAY_HEIGHT),
+                                   interpolation=cv2.INTER_LINEAR)
         dead = [w for w in frame_writers
-                if not await _try_send_jpeg(w, frame)]
+                if not await _try_send_jpeg(w, display_frame)]
         for w in dead: frame_writers.remove(w)
 
         # 키포인트 전송
@@ -302,12 +355,13 @@ async def _try_send_json(writer, obj) -> bool:
 
 # ── 서버 시작 ─────────────────────────────────────────────────
 async def main():
+    # reuse_address=True: 이전 프로세스가 포트를 점유 중이어도 즉시 바인딩
     frame_server    = await asyncio.start_server(
-        handle_frame_client,    "127.0.0.1", FRAME_PORT)
+        handle_frame_client,    "127.0.0.1", FRAME_PORT,    reuse_address=True)
     keypoint_server = await asyncio.start_server(
-        handle_keypoint_client, "127.0.0.1", KEYPOINT_PORT)
+        handle_keypoint_client, "127.0.0.1", KEYPOINT_PORT, reuse_address=True)
     control_server  = await asyncio.start_server(
-        handle_control_client,  "127.0.0.1", CONTROL_PORT)
+        handle_control_client,  "127.0.0.1", CONTROL_PORT,  reuse_address=True)
 
     print(f"[Server] 프레임 포트:   127.0.0.1:{FRAME_PORT}")
     print(f"[Server] 키포인트 포트: 127.0.0.1:{KEYPOINT_PORT}")

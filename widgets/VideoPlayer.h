@@ -75,6 +75,7 @@ private:
 
     // 컨트롤 UI
     QPushButton            *m_playBtn;
+    QPushButton            *m_loopBtn;     // 반복 재생 버튼
     QSlider                *m_progressSlider;
     QLabel                 *m_timeLabel;
 
@@ -83,6 +84,7 @@ private:
     QString m_saveDir    = "videos";
     double  m_speed      = 1.0;
     int     m_currentWordId = -1;
+    bool    m_loopEnabled   = false;    // 반복 재생 여부
 
     // 다운로드 중인 파일명 추적 (중복 다운로드 방지)
     QSet<QString> m_downloading;

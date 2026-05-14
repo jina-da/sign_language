@@ -7,6 +7,10 @@
 
 #include <QDebug>
 #include <QMenu>
+#include <QProcess>
+#include <QCoreApplication>
+#include <QFileInfo>
+#include <QMessageBox>
 
 MainWindow::MainWindow(QWidget *parent)
     : QWidget(parent)
@@ -65,8 +69,9 @@ MainWindow::MainWindow(QWidget *parent)
         else if (cur == m_testWidget)   m_testWidget->onKeypointFrame(kp);
     });
 
-    // keypoint_server에 연결 시작
-    m_kpClient->connectToServer("127.0.0.1");
+    // keypoint_server 자동 실행
+    // connectToServer는 Python stdout의 "[Server]" 확인 후 호출 (startKeypointServer 내부)
+    startKeypointServer();
 
     // ── userBtn 드롭다운 메뉴 ─────────────────────────
     connect(ui->userBtn, &QPushButton::clicked,
@@ -99,6 +104,22 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     m_kpClient->disconnectFromServer();
+
+    // keypoint_server 프로세스 종료
+    if (m_keypointProcess && m_keypointProcess->state() != QProcess::NotRunning) {
+        // bat 파일로 실행한 경우 cmd가 python 자식 프로세스를 생성하므로
+        // terminate()만으로는 자식까지 종료되지 않음.
+        // taskkill /F /T: 프로세스 트리 전체를 강제 종료
+        qint64 pid = m_keypointProcess->processId();
+        if (pid > 0) {
+            QProcess::execute("taskkill",
+                { "/F", "/T", "/PID", QString::number(pid) });
+        }
+        m_keypointProcess->terminate();
+        if (!m_keypointProcess->waitForFinished(2000))
+            m_keypointProcess->kill();
+    }
+
     delete ui;
 }
 
@@ -237,4 +258,115 @@ void MainWindow::switchToReview()
 {
     // ReviewWidget이 인덱스 2에 정확히 삽입되어 있으므로 switchTab(2)로 충분
     switchTab(2);
+}
+
+// ─────────────────────────────────────────────────────────────
+// startKeypointServer
+// 실행 파일 옆의 keypoint_server/keypoint_server.py 를 python으로 실행한다.
+// 이미 실행 중이면 중복 실행하지 않는다.
+// ─────────────────────────────────────────────────────────────
+// startKeypointServer
+// 우선순위:
+//   1. keypoint_server.exe  — 배포용 (pyinstaller 빌드 결과물)
+//   2. run_keypoint_server.bat — 개발용 (bat 안의 Python 절대경로 사용)
+//   3. python3 / python     — 폴백 (PATH에 등록된 경우)
+// ─────────────────────────────────────────────────────────────
+void MainWindow::startKeypointServer()
+{
+    if (m_keypointProcess &&
+        m_keypointProcess->state() != QProcess::NotRunning) {
+        qDebug() << "[KP] keypoint_server 이미 실행 중";
+        return;
+    }
+
+    QString serverDir = QCoreApplication::applicationDirPath()
+                        + "/keypoint_server";
+    QString exePath   = serverDir + "/keypoint_server.exe";
+    QString batPath   = serverDir + "/run_keypoint_server.bat";
+    QString pyPath    = serverDir + "/keypoint_server.py";
+
+    m_keypointProcess = new QProcess(this);
+    m_keypointProcess->setWorkingDirectory(serverDir);
+
+    connect(m_keypointProcess, &QProcess::readyReadStandardOutput, this, [this] {
+        QString output = QString::fromUtf8(
+            m_keypointProcess->readAllStandardOutput()).trimmed();
+        qDebug() << "[KP-py]" << output;
+
+        // Python 서버가 포트 바인딩 완료("[Server]" 출력)된 시점에 Qt 연결 시작
+        // 이전에 연결을 시도한 적 없는 경우에만 (재연결은 KeypointClient가 자동 처리)
+        if (!m_kpServerReady && output.contains("[Server]")) {
+            m_kpServerReady = true;
+            qDebug() << "[KP] Python 서버 준비 완료 → 연결 시작";
+            m_kpClient->connectToServer("127.0.0.1");
+        }
+    });
+    connect(m_keypointProcess, &QProcess::readyReadStandardError, this, [this] {
+        qDebug() << "[KP-py ERR]"
+                 << m_keypointProcess->readAllStandardError().trimmed();
+    });
+    connect(m_keypointProcess,
+            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this](int code, QProcess::ExitStatus status) {
+        if (status == QProcess::CrashExit || code != 0)
+            qDebug() << "[KP] keypoint_server 비정상 종료 — code:" << code;
+        else
+            qDebug() << "[KP] keypoint_server 정상 종료";
+    });
+
+    // ── 1순위: keypoint_server.exe (배포용) ──────────────────
+    if (QFileInfo::exists(exePath)) {
+        m_keypointProcess->start(exePath, {});
+        if (m_keypointProcess->waitForStarted(2000)) {
+            qDebug() << "[KP] keypoint_server.exe 시작 (PID:"
+                     << m_keypointProcess->processId() << ")";
+            scheduleConnectFallback();
+            return;
+        }
+        qDebug() << "[KP] .exe 시작 실패, 다음 방법 시도...";
+    }
+
+    // ── 2순위: run_keypoint_server.bat (개발용) ───────────────
+    if (QFileInfo::exists(batPath)) {
+        // cmd /c: 콘솔 창 없이 bat 실행
+        m_keypointProcess->start("cmd", { "/c", batPath });
+        if (m_keypointProcess->waitForStarted(2000)) {
+            qDebug() << "[KP] bat 파일로 시작 (PID:"
+                     << m_keypointProcess->processId() << ")";
+            scheduleConnectFallback();
+            return;
+        }
+        qDebug() << "[KP] bat 시작 실패, 다음 방법 시도...";
+    }
+
+    // ── 3순위: python3 / python (폴백) ───────────────────────
+    if (QFileInfo::exists(pyPath)) {
+        for (const QString &exe : { QString("python3"), QString("python") }) {
+            m_keypointProcess->start(exe, { pyPath });
+            if (m_keypointProcess->waitForStarted(1500)) {
+                qDebug() << "[KP]" << exe << "로 시작 (PID:"
+                         << m_keypointProcess->processId() << ")";
+                scheduleConnectFallback();
+                return;
+            }
+        }
+    }
+
+    qDebug() << "[KP] 모든 방법 실패 — keypoint_server를 수동으로 실행해 주세요.";
+}
+
+// ─────────────────────────────────────────────────────────────
+// scheduleConnectFallback
+// Python stdout에서 "[Server]" 감지 시 connectToServer가 호출되지만,
+// stdout 버퍼링으로 신호가 늦거나 없을 경우를 위한 최대 10초 폴백.
+// ─────────────────────────────────────────────────────────────
+void MainWindow::scheduleConnectFallback()
+{
+    QTimer::singleShot(10000, this, [this] {
+        if (!m_kpServerReady) {
+            qDebug() << "[KP] 폴백: 10초 경과 → 강제 연결 시도";
+            m_kpServerReady = true;
+            m_kpClient->connectToServer("127.0.0.1");
+        }
+    });
 }

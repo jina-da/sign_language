@@ -14,48 +14,91 @@ KeypointClient::KeypointClient(QObject *parent)
     m_reconnectTimer->setSingleShot(true);
     m_reconnectTimer->setInterval(RECONNECT_MS);
 
+    // ── 데이터 수신 ──────────────────────────────────────────
     connect(m_frameSocket,    &QTcpSocket::readyRead,
             this,             &KeypointClient::onFrameReadyRead);
     connect(m_keypointSocket, &QTcpSocket::readyRead,
             this,             &KeypointClient::onKeypointReadyRead);
-    connect(m_frameSocket,    &QTcpSocket::disconnected,
-            this,             &KeypointClient::onDisconnected);
-    connect(m_reconnectTimer, &QTimer::timeout,
-            this,             &KeypointClient::tryReconnect);
-}
 
-void KeypointClient::connectToServer(const QString &host)
-{
-    m_host = host;
-    m_frameSocket->connectToHost(host, FRAME_PORT);
-    m_keypointSocket->connectToHost(host, KEYPOINT_PORT);
-    m_controlSocket->connectToHost(host, CONTROL_PORT);
-
-    // 연결 성공 시그널
-    connect(m_frameSocket, &QTcpSocket::connected, this, [this]{
-        if (!m_connected) {
-            m_connected = true;
-            qDebug() << "[KP] keypoint_server 연결 성공";
-            emit connectionChanged(true);
-        }
+    // ── frameSocket 연결 성공 ────────────────────────────────
+    connect(m_frameSocket, &QTcpSocket::connected, this, [this] {
+        m_frameConnected = true;
+        qDebug() << "[KP] frameSocket 연결됨";
+        checkAndEmitConnected();
     });
 
-    // 제어 소켓 연결 완료 시 대기 중인 우세손 설정 전송
-    connect(m_controlSocket, &QTcpSocket::connected, this, [this]{
+    // ── keypointSocket 연결 성공 ─────────────────────────────
+    connect(m_keypointSocket, &QTcpSocket::connected, this, [this] {
+        m_keypointConnected = true;
+        qDebug() << "[KP] keypointSocket 연결됨";
+        checkAndEmitConnected();
+    });
+
+    // ── controlSocket 연결 성공 → 대기 중 우세손 전송 ────────
+    connect(m_controlSocket, &QTcpSocket::connected, this, [this] {
         qDebug() << "[KP] 제어 소켓 연결 완료";
         if (m_hasPendingDominant)
             sendDominantHand();
     });
+
+    // ── 데이터 소켓 끊김 (frame / keypoint) ──────────────────
+    connect(m_frameSocket,    &QTcpSocket::disconnected,
+            this,             &KeypointClient::onDataSocketDisconnected);
+    connect(m_keypointSocket, &QTcpSocket::disconnected,
+            this,             &KeypointClient::onDataSocketDisconnected);
+
+    // ── controlSocket 끊김 — 데이터 소켓과 독립 처리 ─────────
+    connect(m_controlSocket, &QTcpSocket::disconnected,
+            this,            &KeypointClient::onControlDisconnected);
+
+    // ── 재연결 타이머 ────────────────────────────────────────
+    connect(m_reconnectTimer, &QTimer::timeout,
+            this,             &KeypointClient::tryReconnect);
 }
 
+// ── 두 데이터 소켓이 모두 연결됐을 때 connected 시그널 발생 ─
+void KeypointClient::checkAndEmitConnected()
+{
+    if (m_frameConnected && m_keypointConnected && !m_connected) {
+        m_connected = true;
+        m_reconnectTimer->stop();
+        qDebug() << "[KP] keypoint_server 연결 성공";
+        emit connectionChanged(true);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 최초 연결
+// ─────────────────────────────────────────────────────────────
+void KeypointClient::connectToServer(const QString &host)
+{
+    m_host = host;
+    m_intentionalDisconnect = false;
+
+    if (m_frameSocket->state() != QAbstractSocket::UnconnectedState)
+        return;
+
+    qDebug() << "[KP] 연결 시도:" << host;
+    m_frameSocket->connectToHost(host, FRAME_PORT);
+    m_keypointSocket->connectToHost(host, KEYPOINT_PORT);
+    m_controlSocket->connectToHost(host, CONTROL_PORT);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 명시적 연결 해제
+// ─────────────────────────────────────────────────────────────
 void KeypointClient::disconnectFromServer()
 {
+    m_intentionalDisconnect = true;
     m_reconnectTimer->stop();
     m_frameSocket->disconnectFromHost();
     m_keypointSocket->disconnectFromHost();
     m_controlSocket->disconnectFromHost();
 }
 
+// ─────────────────────────────────────────────────────────────
+// 우세손 설정
+// ─────────────────────────────────────────────────────────────
 void KeypointClient::setDominantHand(bool isDominantLeft)
 {
     m_pendingDominantLeft = isDominantLeft;
@@ -94,7 +137,7 @@ bool KeypointClient::isConnected() const
 }
 
 // ─────────────────────────────────────────────────────────────
-// 프레임 수신 처리
+// 프레임/키포인트 수신
 // ─────────────────────────────────────────────────────────────
 void KeypointClient::onFrameReadyRead()
 {
@@ -102,9 +145,6 @@ void KeypointClient::onFrameReadyRead()
     processBuffer(m_frameBuffer, true);
 }
 
-// ─────────────────────────────────────────────────────────────
-// 키포인트 수신 처리
-// ─────────────────────────────────────────────────────────────
 void KeypointClient::onKeypointReadyRead()
 {
     m_keypointBuffer.append(m_keypointSocket->readAll());
@@ -117,7 +157,6 @@ void KeypointClient::onKeypointReadyRead()
 void KeypointClient::processBuffer(QByteArray &buffer, bool isFrame)
 {
     while (true) {
-        // 헤더 4바이트 확인
         if (buffer.size() < 4) break;
 
         quint32 bodyLen =
@@ -137,13 +176,11 @@ void KeypointClient::processBuffer(QByteArray &buffer, bool isFrame)
         buffer.remove(0, 4 + bodyLen);
 
         if (isFrame) {
-            // JPEG → QImage 변환
             QImage img;
             img.loadFromData(body, "JPEG");
             if (!img.isNull())
                 emit frameReady(img);
         } else {
-            // JSON 파싱
             QJsonDocument doc = QJsonDocument::fromJson(body);
             if (doc.isObject())
                 emit keypointReady(doc.object());
@@ -152,23 +189,78 @@ void KeypointClient::processBuffer(QByteArray &buffer, bool isFrame)
 }
 
 // ─────────────────────────────────────────────────────────────
-// 연결 끊김 → 재연결 시도
+// 데이터 소켓(frame/keypoint) 끊김
+// controlSocket의 끊김은 여기로 오지 않음
 // ─────────────────────────────────────────────────────────────
-void KeypointClient::onDisconnected()
+void KeypointClient::onDataSocketDisconnected()
 {
+    if (m_intentionalDisconnect)
+        return;
+
+    // 어느 쪽이 끊겼든 플래그 갱신
+    m_frameConnected    = (m_frameSocket->state()    == QAbstractSocket::ConnectedState);
+    m_keypointConnected = (m_keypointSocket->state() == QAbstractSocket::ConnectedState);
+
     if (m_connected) {
         m_connected = false;
-        qDebug() << "[KP] keypoint_server 연결 끊김, 재연결 시도";
+        qDebug() << "[KP] keypoint_server 연결 끊김 — 재연결 대기 중...";
         emit connectionChanged(false);
     }
-    m_reconnectTimer->start();
+
+    // 데이터 소켓 둘 다 정리
+    m_frameSocket->abort();
+    m_keypointSocket->abort();
+    m_frameConnected    = false;
+    m_keypointConnected = false;
+
+    if (!m_reconnectTimer->isActive())
+        m_reconnectTimer->start();
 }
 
+// ─────────────────────────────────────────────────────────────
+// controlSocket 끊김 — 데이터 소켓에 영향 없이 독립 재연결
+// ─────────────────────────────────────────────────────────────
+void KeypointClient::onControlDisconnected()
+{
+    if (m_intentionalDisconnect)
+        return;
+
+    qDebug() << "[KP] 제어 소켓 끊김 — 재연결 시도...";
+    m_controlSocket->abort();
+
+    // 데이터 소켓이 살아있으면 제어 소켓만 재연결
+    if (m_connected) {
+        QTimer::singleShot(1000, this, [this] {
+            if (!m_intentionalDisconnect &&
+                m_controlSocket->state() == QAbstractSocket::UnconnectedState)
+                m_controlSocket->connectToHost(m_host, CONTROL_PORT);
+        });
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 재연결 시도
+// ─────────────────────────────────────────────────────────────
 void KeypointClient::tryReconnect()
 {
-    qDebug() << "[KP] 재연결 시도...";
+    if (m_intentionalDisconnect)
+        return;
+
+    qDebug() << "[KP] 재연결 시도 (" << m_host << ")...";
+
     m_frameBuffer.clear();
     m_keypointBuffer.clear();
+
+    if (m_frameSocket->state()    != QAbstractSocket::UnconnectedState) m_frameSocket->abort();
+    if (m_keypointSocket->state() != QAbstractSocket::UnconnectedState) m_keypointSocket->abort();
+    if (m_controlSocket->state()  != QAbstractSocket::UnconnectedState) m_controlSocket->abort();
+
+    m_frameConnected    = false;
+    m_keypointConnected = false;
+
     m_frameSocket->connectToHost(m_host, FRAME_PORT);
     m_keypointSocket->connectToHost(m_host, KEYPOINT_PORT);
+    m_controlSocket->connectToHost(m_host, CONTROL_PORT);
+
+    m_reconnectTimer->start();
 }

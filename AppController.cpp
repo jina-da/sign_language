@@ -107,8 +107,29 @@ AppController::AppController(QObject *parent)
             {"total_frames",      keypoints.size()},
             {"frames",            keypoints}
         });
+
+        // ── 디버그: 전송 키포인트 요약 로그 ──────────
         qDebug() << "[App] REQ_INFER 전송: word_id=" << wordId
-                 << "frames=" << keypoints.size();
+                 << " frames=" << keypoints.size();
+        if (!keypoints.isEmpty()) {
+            auto logFrame = [](const QJsonObject &f, const QString &label) {
+                QJsonArray lh = f["left_hand"].toArray();
+                QJsonArray rh = f["right_hand"].toArray();
+                auto wrist = [](const QJsonArray &h) -> QString {
+                    if (h.isEmpty()) return "(없음)";
+                    QJsonArray w = h[0].toArray();
+                    return QString("(%1, %2)")
+                        .arg(w[0].toDouble(), 0, 'f', 3)
+                        .arg(w[1].toDouble(), 0, 'f', 3);
+                };
+                qDebug() << "  " << label
+                         << "  L손목:" << wrist(lh)
+                         << "  R손목:" << wrist(rh);
+            };
+            logFrame(keypoints.first().toObject(), "첫프레임 ");
+            logFrame(keypoints.last().toObject(),  "끝프레임 ");
+        }
+        // ─────────────────────────────────────────────
     });
 
     // ── 학습 완료 → 홈 탭 ────────────────────────────
@@ -157,7 +178,19 @@ AppController::AppController(QObject *parent)
             {"total_frames",     keypoints.size()},
             {"frames",           keypoints}
         });
-        qDebug() << "[App] 테스트 REQ_INFER 전송: word_id=" << wordId;
+        qDebug() << "[App] 테스트 REQ_INFER 전송: word_id=" << wordId
+                 << " frames=" << keypoints.size();
+        if (!keypoints.isEmpty()) {
+            auto wrist = [](const QJsonArray &h) -> QString {
+                if (h.isEmpty()) return "(없음)";
+                QJsonArray w = h[0].toArray();
+                return QString("(%1,%2)").arg(w[0].toDouble(),0,'f',3).arg(w[1].toDouble(),0,'f',3);
+            };
+            auto f0 = keypoints.first().toObject();
+            auto fn = keypoints.last().toObject();
+            qDebug() << "  첫프레임 L:" << wrist(f0["left_hand"].toArray()) << " R:" << wrist(f0["right_hand"].toArray());
+            qDebug() << "  끝프레임 L:" << wrist(fn["left_hand"].toArray()) << " R:" << wrist(fn["right_hand"].toArray());
+        }
     });
 
     // ── 복습 완료 → 홈 탭 ────────────────────────────
@@ -180,7 +213,19 @@ AppController::AppController(QObject *parent)
             {"total_frames",     keypoints.size()},
             {"frames",           keypoints}
         });
-        qDebug() << "[App] 복습 REQ_INFER 전송: word_id=" << wordId;
+        qDebug() << "[App] 복습 REQ_INFER 전송: word_id=" << wordId
+                 << " frames=" << keypoints.size();
+        if (!keypoints.isEmpty()) {
+            auto wrist = [](const QJsonArray &h) -> QString {
+                if (h.isEmpty()) return "(없음)";
+                QJsonArray w = h[0].toArray();
+                return QString("(%1,%2)").arg(w[0].toDouble(),0,'f',3).arg(w[1].toDouble(),0,'f',3);
+            };
+            auto f0 = keypoints.first().toObject();
+            auto fn = keypoints.last().toObject();
+            qDebug() << "  첫프레임 L:" << wrist(f0["left_hand"].toArray()) << " R:" << wrist(f0["right_hand"].toArray());
+            qDebug() << "  끝프레임 L:" << wrist(fn["left_hand"].toArray()) << " R:" << wrist(fn["right_hand"].toArray());
+        }
     });
 
     // ── 홈/네비 복습 버튼 클릭 → 즉시 화면 전환 후 서버 요청
@@ -306,7 +351,7 @@ void AppController::start()
     qDebug() << "[App] start()";
     m_loginWidget->resize(1024, 680);
     m_loginWidget->show();
-    m_client->connectToServer("10.10.10.114", 9000);
+    m_client->connectToServer(SERVER_HOST, SERVER_PORT);
 }
 
 void AppController::onConnectionChanged(bool connected)
@@ -367,9 +412,9 @@ void AppController::onMessageReceived(const QJsonObject &msg)
 
             // VideoPlayer 세션 세팅
             m_mainWindow->studyWidget()->videoPlayer()->setSession(
-                "10.10.10.114", m_sessionToken);
+                SERVER_HOST, m_sessionToken);
             m_mainWindow->dictWidget()->setSession(
-                "10.10.10.114", m_sessionToken);
+                SERVER_HOST, m_sessionToken);
 
             m_mainWindow->resize(1024, 680);
             m_mainWindow->show();

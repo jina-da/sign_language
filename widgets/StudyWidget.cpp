@@ -45,6 +45,9 @@ StudyWidget::StudyWidget(QWidget *parent)
     // VideoPlayer 고정 높이 (cameraView와 동일하게)
     m_videoPlayer->setFixedHeight(240);
 
+    // resultCard 초기 숨김 (btnRow 안에 있으므로 공간은 유지됨)
+    ui->resultCard->setVisible(false);
+
     // 재생 완료 시 다시 보기 버튼 활성화
     connect(m_videoPlayer, &VideoPlayer::playbackFinished,
             this, [this]{
@@ -146,18 +149,27 @@ void StudyWidget::loadWord(int index)
     ui->meaningLabel->setText(w.meaning);
     updateProgress();
 
-    ui->resultCard->hide();
+    // 결과 카드 숨김 (statusRow 안에 있으므로 레이아웃 변동 없음)
+    ui->resultCard->setVisible(false);
     ui->nextBtn->setEnabled(false);
     ui->nextBtn->setText("다음 단어 →");
 
     // 이전 단어 버튼: 첫 번째 단어이면 비활성화
     ui->prevBtn->setEnabled(index > 0);
 
+    // 녹화/카운트다운/쿨다운 상태 완전 초기화
     m_isRecording    = false;
     m_keypointBuffer = QJsonArray();
+    m_hasPrevKeypoint = false;
     m_stopTimer->stop();
+    m_countdownTimer->stop();
+    m_cooldownTimer->stop();
+    m_countdown = 0;
 
     ui->recordingLabel->hide();
+    ui->countdownLabel->setText("");
+    ui->recordBtn->setText("● 녹화");
+    ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
     ui->statusLabel->setText(
         "녹화 버튼을 누르거나 스페이스바를 눌러 시작하세요");
 
@@ -195,17 +207,52 @@ void StudyWidget::onKeypointFrame(const QJsonObject &keypoint)
 
     m_keypointBuffer.append(keypoint);
 
-    // 움직임 감지: 손이 보이면 정지 타이머 리셋
-    bool hasHand = false;
-    for (const auto &joint : keypoint["left_hand"].toArray()) {
-        if (joint.toArray()[2].toDouble() > 0.3) { hasHand = true; break; }
-    }
-    if (!hasHand) {
-        for (const auto &joint : keypoint["right_hand"].toArray()) {
-            if (joint.toArray()[2].toDouble() > 0.3) { hasHand = true; break; }
+    // ── 움직임 감지: 이전 프레임과의 좌표 변화량으로 판단 ────
+    // 기준: 왼손 또는 오른손 손목(index 0) x,y 변화량 합계
+    // MOTION_THRESHOLD 이상이면 "움직임 있음" → 타이머 리셋
+    // 미만이면 "정지" → 타이머가 만료되면 자동 종료
+    static constexpr double MOTION_THRESHOLD = 19.2; // 픽셀 기준 (1920x1080 해상도, 약 1%)
+
+    auto wrist = [](const QJsonObject &kp, const QString &side) -> QPointF {
+        const QJsonArray hand = kp[side].toArray();
+        if (hand.isEmpty()) return {};
+        const QJsonArray w = hand[0].toArray();
+        return { w[0].toDouble(), w[1].toDouble() };
+    };
+
+    bool moving = false;
+    if (m_hasPrevKeypoint) {
+        QPointF lCur  = wrist(keypoint,      "left_hand");
+        QPointF lPrev = wrist(m_prevKeypoint, "left_hand");
+        QPointF rCur  = wrist(keypoint,      "right_hand");
+        QPointF rPrev = wrist(m_prevKeypoint, "right_hand");
+
+        // 손이 실제로 감지된 경우(0,0 이 아닌 경우)만 비교
+        auto nonZero = [](QPointF p) { return p.x() != 0.0 || p.y() != 0.0; };
+
+        if (nonZero(lCur) && nonZero(lPrev)) {
+            double dx = lCur.x() - lPrev.x();
+            double dy = lCur.y() - lPrev.y();
+            if (qAbs(dx) + qAbs(dy) >= MOTION_THRESHOLD) moving = true;
+        }
+        if (!moving && nonZero(rCur) && nonZero(rPrev)) {
+            double dx = rCur.x() - rPrev.x();
+            double dy = rCur.y() - rPrev.y();
+            if (qAbs(dx) + qAbs(dy) >= MOTION_THRESHOLD) moving = true;
         }
     }
-    if (hasHand) m_stopTimer->start();
+
+    m_prevKeypoint    = keypoint;
+    m_hasPrevKeypoint = true;
+
+    if (moving) {
+        // 움직임이 감지되는 동안 타이머를 계속 리셋
+        m_stopTimer->start();
+    } else {
+        // 정지 상태: 타이머가 멈춰 있으면 시작 (1.5초 후 자동 종료)
+        if (!m_stopTimer->isActive())
+            m_stopTimer->start();
+    }
 }
 
 
@@ -216,14 +263,18 @@ void StudyWidget::startRecording()
 {
     if (m_isRecording) return;
 
-    m_isRecording    = true;
-    m_keypointBuffer = QJsonArray();
+    m_isRecording       = true;
+    m_keypointBuffer    = QJsonArray();
+    m_hasPrevKeypoint   = false;   // 이전 프레임 초기화
     m_recordingStartTime.start();
 
     ui->recordingLabel->show();
     ui->recordBtn->setText("■ 중단");
     ui->recordBtn->setStyleSheet("QPushButton { background: #E24B4A; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
-    ui->statusLabel->setText("녹화 중... 수화를 입력하세요. 움직임이 멈추면 자동 종료됩니다.");
+    ui->statusLabel->setText("녹화 중... 수화를 입력하세요.\n움직임이 멈추면 자동 종료됩니다.");
+
+    // 타이머는 첫 키포인트 프레임이 들어올 때부터 시작 (onKeypointFrame에서 처리)
+    // 여기서 즉시 시작하면 키포인트 서버 초기화 지연으로 오작동 가능
 
     qDebug() << "[Study] 녹화 시작";
 }
@@ -237,7 +288,7 @@ void StudyWidget::stopRecording()
     m_isRecording = false;
     m_stopTimer->stop();
     ui->recordingLabel->hide();
-    ui->recordBtn->setText("⏺ 녹화");
+    ui->recordBtn->setText("● 녹화");
     ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
 
     int frameCount = m_keypointBuffer.size();
@@ -277,7 +328,8 @@ void StudyWidget::showResult(const QString &verdict,
 {
     Q_UNUSED(predictedWordId)
 
-    ui->resultCard->show();
+    // 결과 카드 표시
+    ui->resultCard->setVisible(true);
     ui->confidenceLabel->setText(
         QString("신뢰도: %1%").arg(confidence, 0, 'f', 1));
 
@@ -424,14 +476,15 @@ void StudyWidget::keyPressEvent(QKeyEvent *event)
 
 void StudyWidget::onRecordBtnClicked()
 {
-    if (m_countdownTimer->isActive()) {
+    // 카운트다운 진행 중(m_countdown > 0)일 때만 취소 처리
+    // m_countdown == 0이면 tick이 이벤트 큐에 남아있는 순간이므로 취소하지 않음
+    if (m_countdownTimer->isActive() && m_countdown > 0) {
         // 카운트다운 중 취소
         m_countdownTimer->stop();
         m_countdown = 0;
-        ui->countdownLabel->hide();
         ui->countdownLabel->setText("");
         ui->statusLabel->setText("녹화가 취소됐습니다.");
-        ui->recordBtn->setText("⏺ 녹화");
+        ui->recordBtn->setText("● 녹화");
         ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
         return;
     }
@@ -442,21 +495,19 @@ void StudyWidget::onRecordBtnClicked()
         m_stopTimer->stop();
         m_keypointBuffer = QJsonArray();
         ui->recordingLabel->hide();
-        ui->countdownLabel->hide();
-        ui->recordBtn->setText("⏺ 녹화");
+        ui->recordBtn->setText("● 녹화");
         ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
         ui->statusLabel->setText("녹화가 중단됐습니다. 다시 시작하려면 버튼을 누르세요.");
         qDebug() << "[Study] 녹화 중단 (전송 안 함)";
         return;
     }
 
-    // 카운트다운 시작
+    // 카운트다운 시작 — 버튼은 초록 유지, 색상은 실제 녹화 시작 시점에 빨간색으로 변경
     m_countdown = 3;
     ui->countdownLabel->setText(QString::number(m_countdown));
-    ui->countdownLabel->show();
     ui->statusLabel->setText("잠시 후 녹화가 시작됩니다...");
     ui->recordBtn->setText("■ 취소");
-    ui->recordBtn->setStyleSheet("QPushButton { background: #E24B4A; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
+    ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
     m_countdownTimer->start();
     qDebug() << "[Study] 카운트다운 시작";
 }
@@ -469,7 +520,6 @@ void StudyWidget::onCountdownTick()
     } else {
         // 카운트다운 완료 → 녹화 시작
         m_countdownTimer->stop();
-        ui->countdownLabel->hide();
         ui->countdownLabel->setText("");
         startRecording();
     }

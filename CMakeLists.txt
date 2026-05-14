@@ -85,3 +85,11 @@ target_include_directories(SignLearnClient PRIVATE
 )
 
 qt_finalize_executable(SignLearnClient)
+
+# 빌드 완료 후 keypoint_server 폴더를 실행 파일 옆에 복사
+add_custom_command(TARGET SignLearnClient POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/keypoint_server"
+        "$<TARGET_FILE_DIR:SignLearnClient>/keypoint_server"
+    COMMENT "keypoint_server 폴더 복사 중..."
+)

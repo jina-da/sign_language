@@ -74,6 +74,8 @@ private:
     QElapsedTimer  m_recordingStartTime;
     bool           m_isRecording = false;
     QJsonArray     m_keypointBuffer;
+    QJsonObject    m_prevKeypoint;
+    bool           m_hasPrevKeypoint = false;
 
     QString        m_serverHost;
     QString        m_sessionToken;

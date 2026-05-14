@@ -360,16 +360,29 @@ void DictWidget::onKeypointFrame(const QJsonObject &keypoint)
 
     m_keypointBuffer.append(keypoint);
 
-    bool hasHand = false;
-    for (const auto &joint : keypoint["left_hand"].toArray()) {
-        if (joint.toArray()[2].toDouble() > 0.3) { hasHand = true; break; }
+    static constexpr double MOTION_THRESHOLD = 19.2; // 픽셀 기준 (1920x1080 해상도, 약 1%)
+    auto wrist = [](const QJsonObject &kp, const QString &side) -> QPointF {
+        const QJsonArray hand = kp[side].toArray();
+        if (hand.isEmpty()) return {};
+        const QJsonArray w = hand[0].toArray();
+        return { w[0].toDouble(), w[1].toDouble() };
+    };
+
+    bool moving = false;
+    if (m_hasPrevKeypoint) {
+        auto nonZero = [](QPointF p){ return p.x() != 0.0 || p.y() != 0.0; };
+        QPointF lC = wrist(keypoint, "left_hand"),  lP = wrist(m_prevKeypoint, "left_hand");
+        QPointF rC = wrist(keypoint, "right_hand"), rP = wrist(m_prevKeypoint, "right_hand");
+        if (nonZero(lC) && nonZero(lP) && qAbs(lC.x()-lP.x())+qAbs(lC.y()-lP.y()) >= MOTION_THRESHOLD) moving = true;
+        if (!moving && nonZero(rC) && nonZero(rP) && qAbs(rC.x()-rP.x())+qAbs(rC.y()-rP.y()) >= MOTION_THRESHOLD) moving = true;
     }
-    if (!hasHand) {
-        for (const auto &joint : keypoint["right_hand"].toArray()) {
-            if (joint.toArray()[2].toDouble() > 0.3) { hasHand = true; break; }
-        }
-    }
-    if (hasHand) m_stopTimer->start();
+    m_prevKeypoint    = keypoint;
+    m_hasPrevKeypoint = true;
+
+    if (moving)
+        m_stopTimer->start();
+    else if (!m_stopTimer->isActive())
+        m_stopTimer->start();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -378,13 +391,15 @@ void DictWidget::onKeypointFrame(const QJsonObject &keypoint)
 void DictWidget::startRecording()
 {
     if (m_isRecording) return;
-    m_isRecording    = true;
-    m_keypointBuffer = QJsonArray();
+    m_isRecording       = true;
+    m_keypointBuffer    = QJsonArray();
+    m_hasPrevKeypoint   = false;
     m_recordingStartTime.start();
 
     ui->recordingLabel->show();
     ui->statusLabel->setText("녹화 중... 수화를 입력하고 공수 자세로 종료하세요.");
     ui->reverseResultCard->hide();
+    m_stopTimer->start();
     qDebug() << "[Dict] 역방향 녹화 시작";
 }
 
@@ -423,7 +438,7 @@ void DictWidget::keyPressEvent(QKeyEvent *event)
 
 void DictWidget::onRecordBtnClicked()
 {
-    if (m_countdownTimer->isActive()) {
+    if (m_countdownTimer->isActive() && m_countdown > 0) {
         m_countdownTimer->stop(); m_countdown = 0;
         ui->statusLabel->setText("녹화가 취소됐습니다.");
         ui->recordBtn->setText("⏺ 녹화");

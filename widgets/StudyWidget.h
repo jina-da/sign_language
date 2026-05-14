@@ -76,6 +76,8 @@ private:
     double m_playSpeed    = 1.0;
 
     QJsonArray    m_keypointBuffer;
+    QJsonObject   m_prevKeypoint;       // 직전 프레임 (움직임 감지용)
+    bool          m_hasPrevKeypoint = false;
     QTimer       *m_stopTimer;
     QTimer       *m_countdownTimer;   // 3초 카운트다운
     int            m_countdown = 0;   // 남은 카운트 (3→2→1→0)
