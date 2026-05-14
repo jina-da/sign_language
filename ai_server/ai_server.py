@@ -47,8 +47,6 @@ class AIServer:
         self.model  = None
         self.labels = None  # 클래스 인덱스 → 단어명 매핑
         self.lock   = asyncio.Lock()  # 모델 교체 중 추론 방지
-        self.train_mean = None  # ← 추가
-        self.train_std  = None  # ← 추가
 
     def load_model(self, model_path: Path = MODEL_PATH):
         """
@@ -64,7 +62,6 @@ class AIServer:
 
         self.model  = model
         self.labels = np.load(LABELS_PATH, allow_pickle=True)
-        self.load_train_stats()  # ← 추가
 
         print(f"[{now()}] 모델 로드 완료 (val_acc: {checkpoint['val_acc']:.4f})")
 
@@ -87,26 +84,14 @@ class AIServer:
     def _parse_frames(self, frames: list) -> np.ndarray:
         """
         운용서버에서 받은 딕셔너리 형태 frames → (T, 134) numpy array 변환
-        입력 형태:
-        [{ "frame_idx": 0, "is_gongsu": false,
-            "pose": [[x,y,c], ...],        # 25개 관절 (픽셀값)
-            "left_hand": [[x,y,c], ...],   # 21개 관절 (픽셀값)
-            "right_hand": [[x,y,c], ...],  # 21개 관절 (픽셀값)
-        }, ...]
-        출력: (T, 134) float32
         pose 25×2 + left_hand 21×2 + right_hand 21×2 = 134차원
-        픽셀값 → /1920, /1080 정규화 (학습 데이터와 동일한 방식)
+        픽셀값 → /1920, /1080 정규화
         """
         IMG_W = 1920.0
         IMG_H = 1080.0
 
         result = []
         for frame in frames:
-            # is_gongsu=true 프레임 제외
-            if frame.get("is_gongsu", False):
-                continue
-
-            # x는 /1920, y는 /1080 정규화 (학습 데이터와 동일)
             pose = [
                 joint[0] / IMG_W if j == 0 else joint[1] / IMG_H
                 for joint in frame.get("pose", [])
@@ -123,7 +108,7 @@ class AIServer:
                 for j in range(2)
             ]
 
-            flat = pose + left_hand + right_hand  # 134차원
+            flat = pose + left_hand + right_hand
 
             if len(flat) != 134:
                 print(f"[{now()}] 프레임 차원 오류: {len(flat)} → 스킵")
@@ -132,28 +117,15 @@ class AIServer:
             result.append(flat)
 
         if not result:
-            raise ValueError("유효한 프레임 없음 (is_gongsu 제외 후 0개)")
+            raise ValueError("유효한 프레임 없음")
 
         return np.array(result, dtype=np.float32)
-
-    def load_train_stats(self):
-        """학습 데이터 통계 로드 (좌표 분포 보정용)"""
-        self.train_mean = np.load("data/processed/train_mean.npy")
-        self.train_std  = np.load("data/processed/train_std.npy")
-        print(f"[{now()}] 학습 통계 로드 완료")
 
     @torch.no_grad()
     def infer(self, frames: list) -> dict:
         t0 = time.monotonic()
 
         seq = self._parse_frames(frames)  # (T, 134) — 0~1 정규화값
-
-        # 입력 분포 → 학습 분포로 변환
-        # 입력을 z-score 정규화 후 학습 데이터 분포로 역변환
-        input_mean = seq.mean(axis=0)
-        input_std  = seq.std(axis=0) + 1e-8
-        seq = (seq - input_mean) / input_std          # z-score 정규화
-        seq = seq * self.train_std + self.train_mean  # 학습 분포로 변환
 
         x            = torch.tensor(seq).unsqueeze(0).to(DEVICE)
         padding_mask = torch.zeros(1, x.shape[1], dtype=torch.bool).to(DEVICE)

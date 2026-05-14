@@ -22,6 +22,33 @@ FPS     = 30
 IMG_W   = 1920
 IMG_H   = 1080
 PERSONS = [f"{i:02d}" for i in range(1, 17)]  # 01~16
+OPENPOSE_TO_MEDIAPIPE_POSE = [
+    0,   # 0: Nose → Nose
+    16,  # 1: Left eye inner → LEye
+    16,  # 2: Left eye → LEye
+    16,  # 3: Left eye outer → LEye
+    15,  # 4: Right eye inner → REye
+    15,  # 5: Right eye → REye
+    15,  # 6: Right eye outer → REye
+    18,  # 7: Left ear → LEar
+    17,  # 8: Right ear → REar
+    0,   # 9: Mouth left → Nose 근사
+    0,   # 10: Mouth right → Nose 근사
+    5,   # 11: Left shoulder → LShoulder
+    2,   # 12: Right shoulder → RShoulder
+    6,   # 13: Left elbow → LElbow
+    3,   # 14: Right elbow → RElbow
+    7,   # 15: Left wrist → LWrist
+    4,   # 16: Right wrist → RWrist
+    7,   # 17: Left pinky → LWrist 근사
+    4,   # 18: Right pinky → RWrist 근사
+    7,   # 19: Left index → LWrist 근사
+    4,   # 20: Right index → RWrist 근사
+    7,   # 21: Left thumb → LWrist 근사
+    4,   # 22: Right thumb → RWrist 근사
+    12,  # 23: Left hip → LHip
+    9,   # 24: Right hip → RHip
+]
 
 
 def load_syn_words(csv_path: Path) -> dict:
@@ -48,16 +75,26 @@ def get_frame_range(morpheme_path: Path) -> tuple | None:
 
 def extract_keypoints(frame_path: Path) -> np.ndarray:
     """keypoint JSON 1프레임 → 정규화된 좌표 배열 (134,) 반환
-    pose 25개 + hand_left 21개 + hand_right 21개 = 67개 × 2(x,y) = 134
+    pose: OpenPose 순서 → MediaPipe 순서로 재배열
+    hand: OpenPose와 MediaPipe 순서 동일하므로 그대로 사용
     """
     with open(frame_path) as f:
         data = json.load(f)
     p = data['people']
 
     result = []
-    for key in ['pose_keypoints_2d', 'hand_left_keypoints_2d', 'hand_right_keypoints_2d']:
+
+    # pose 25개: MediaPipe 순서에 맞게 재배열
+    pose_coords = p['pose_keypoints_2d']
+    pose_xs = pose_coords[0::3]  # confidence 제외
+    pose_ys = pose_coords[1::3]
+    for op_idx in OPENPOSE_TO_MEDIAPIPE_POSE:
+        result.extend([pose_xs[op_idx] / IMG_W, pose_ys[op_idx] / IMG_H])
+
+    # hand 21개 × 2: 순서 동일하므로 그대로
+    for key in ['hand_left_keypoints_2d', 'hand_right_keypoints_2d']:
         coords = p[key]
-        xs = coords[0::3]  # confidence 제외
+        xs = coords[0::3]
         ys = coords[1::3]
         for x, y in zip(xs, ys):
             result.extend([x / IMG_W, y / IMG_H])
