@@ -82,11 +82,6 @@ class AIServer:
             print(f"[{now()}] 모델 교체 완료 (val_acc: {checkpoint['val_acc']:.4f})")
 
     def _parse_frames(self, frames: list) -> np.ndarray:
-        """
-        운용서버에서 받은 딕셔너리 형태 frames → (T, 134) numpy array 변환
-        pose 25×2 + left_hand 21×2 + right_hand 21×2 = 134차원
-        픽셀값 → /1920, /1080 정규화
-        """
         IMG_W = 1920.0
         IMG_H = 1080.0
 
@@ -109,17 +104,22 @@ class AIServer:
             ]
 
             flat = pose + left_hand + right_hand
-
             if len(flat) != 134:
                 print(f"[{now()}] 프레임 차원 오류: {len(flat)} → 스킵")
                 continue
-
             result.append(flat)
 
         if not result:
             raise ValueError("유효한 프레임 없음")
 
-        return np.array(result, dtype=np.float32)
+        seq = np.array(result, dtype=np.float32)  # (T, 134)
+
+        # 차분 계산 (동작 변화량)
+        delta = np.zeros_like(seq)
+        delta[1:] = seq[1:] - seq[:-1]
+
+        # 좌표 + 차분 합치기 → (T, 268)
+        return np.concatenate([seq, delta], axis=1).astype(np.float32)
 
     @torch.no_grad()
     def infer(self, frames: list) -> dict:

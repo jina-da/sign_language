@@ -124,12 +124,17 @@ def process_sample(word_num: str, person: str) -> np.ndarray | None:
 
     if len(frames) == 0:
         return None
-
-     # 최소 5프레임 이상인 샘플만 사용
     if len(frames) < 5:
         return None
 
-    return np.array(frames, dtype=np.float32)  # (T, 134)
+    seq = np.array(frames, dtype=np.float32)  # (T, 134)
+
+    # 차분 계산 (동작 변화량 추가)
+    delta = np.zeros_like(seq)
+    delta[1:] = seq[1:] - seq[:-1]
+
+    # 좌표 + 차분 합치기 → (T, 268)
+    return np.concatenate([seq, delta], axis=1).astype(np.float32)
 
 
 
