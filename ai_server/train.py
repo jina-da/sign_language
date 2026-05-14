@@ -165,6 +165,7 @@ def main():
     # ── 원본 데이터 로드 ───────────────────────────────
     sequences = np.load(DATA_DIR / "sequences.npy",     allow_pickle=True)
     labels    = np.load(DATA_DIR / "label_indices.npy")
+
     print(f"원본 샘플 수: {len(sequences)}")
 
     # ── 원본 기준으로 8:1:1 분리 ──────────────────────

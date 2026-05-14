@@ -47,6 +47,8 @@ class AIServer:
         self.model  = None
         self.labels = None  # 클래스 인덱스 → 단어명 매핑
         self.lock   = asyncio.Lock()  # 모델 교체 중 추론 방지
+        self.train_mean = None  # ← 추가
+        self.train_std  = None  # ← 추가
 
     def load_model(self, model_path: Path = MODEL_PATH):
         """
@@ -62,6 +64,7 @@ class AIServer:
 
         self.model  = model
         self.labels = np.load(LABELS_PATH, allow_pickle=True)
+        self.load_train_stats()  # ← 추가
 
         print(f"[{now()}] 모델 로드 완료 (val_acc: {checkpoint['val_acc']:.4f})")
 
@@ -133,38 +136,42 @@ class AIServer:
 
         return np.array(result, dtype=np.float32)
 
+    def load_train_stats(self):
+        """학습 데이터 통계 로드 (좌표 분포 보정용)"""
+        self.train_mean = np.load("data/processed/train_mean.npy")
+        self.train_std  = np.load("data/processed/train_std.npy")
+        print(f"[{now()}] 학습 통계 로드 완료")
+
     @torch.no_grad()
     def infer(self, frames: list) -> dict:
-        """
-        keypoint 시퀀스 추론
-        frames: 운용서버에서 받은 딕셔너리 형태 프레임 리스트
-        반환: {predicted_word_id, confidence, inference_ms}
-              predicted_word_id: DB id 기준 (클래스 인덱스 + 1)
-        """
         t0 = time.monotonic()
 
-        # 딕셔너리 frames → (T, 134) numpy array 변환
-        seq = self._parse_frames(frames)                      # (T, 134)
-        x   = torch.tensor(seq).unsqueeze(0).to(DEVICE)      # (1, T, 134)
+        seq = self._parse_frames(frames)  # (T, 134) — 0~1 정규화값
 
-        # padding_mask: 단일 시퀀스라 패딩 없음
+        # 입력 분포 → 학습 분포로 변환
+        # 입력을 z-score 정규화 후 학습 데이터 분포로 역변환
+        input_mean = seq.mean(axis=0)
+        input_std  = seq.std(axis=0) + 1e-8
+        seq = (seq - input_mean) / input_std          # z-score 정규화
+        seq = seq * self.train_std + self.train_mean  # 학습 분포로 변환
+
+        x            = torch.tensor(seq).unsqueeze(0).to(DEVICE)
         padding_mask = torch.zeros(1, x.shape[1], dtype=torch.bool).to(DEVICE)
 
-        # 추론
-        logits               = self.model(x, padding_mask)   # (1, 1000)
+        logits               = self.model(x, padding_mask)
         probs                = torch.softmax(logits, dim=1)
         confidence, pred_idx = probs.max(dim=1)
 
         class_idx         = int(pred_idx.item())
-        predicted_word_id = class_idx + 1                    # 클래스 인덱스 → DB id (+1)
+        predicted_word_id = class_idx + 1
         conf              = float(confidence.item())
         inference_ms      = int((time.monotonic() - t0) * 1000)
 
-        word_name = str(self.labels[class_idx])              # 로그용
+        word_name = str(self.labels[class_idx])
         print(f"[{now()}] 추론: {word_name} (word_id={predicted_word_id}, confidence={conf:.4f}, {inference_ms}ms)")
 
         return {
-            "predicted_word_id": predicted_word_id,          # DB id (1~1000)
+            "predicted_word_id": predicted_word_id,
             "confidence":        round(conf, 4),
             "inference_ms":      inference_ms,
         }

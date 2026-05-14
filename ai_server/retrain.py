@@ -13,9 +13,13 @@ import numpy as np
 import json
 import shutil
 import pymysql
+import os
 from pathlib import Path
 from datetime import datetime
 from torch.utils.data import DataLoader
+from dotenv import load_dotenv
+
+load_dotenv()  # .env 파일 로드
 
 from model import build_gru_model
 from train import SignLanguageDataset, collate_fn, evaluate
@@ -34,11 +38,11 @@ LR              = 1e-5  # Fine-tuning은 학습률 낮게
 
 # ── DB 접속 설정 ────────────────────────────────────────
 DB_CONFIG = {
-    "host":     "10.10.10.114",
-    "port":     3306,
-    "user":     "jina",
-    "password": "1234",  # ← 실제 비밀번호로 교체
-    "database": "ksl_learning",
+    "host":     os.getenv("DB_HOST", "10.10.10.114"),
+    "port":     int(os.getenv("DB_PORT", 3306)),
+    "user":     os.getenv("DB_USER", "jina"),
+    "password": os.getenv("DB_PASSWORD", ""),
+    "database": os.getenv("DB_NAME", "ksl_learning"),
     "charset":  "utf8mb4",
 }
 

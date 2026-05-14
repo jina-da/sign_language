@@ -113,10 +113,10 @@ class SignLanguageGRU(nn.Module):
     def __init__(
         self,
         input_dim: int = 134,      # keypoint 차원
-        hidden_dim: int = 256,     # GRU hidden 차원
+        hidden_dim: int = 512,     # GRU hidden 차원
         num_layers: int = 3,       # GRU 레이어 수
         num_classes: int = 1000,   # 분류할 단어 수
-        dropout: float = 0.3       # 드롭아웃 비율
+        dropout: float = 0.4       # 드롭아웃 비율
     ):
         super().__init__()
 
