@@ -27,7 +27,6 @@ def load_train_sample(word_id: int, n_samples: int = 3):
     return samples, word_name
 
 def load_test_keypoint(json_path: str):
-    """운용서버에서 저장한 keypoint JSON 로드 → (T, 134) 변환"""
     import json
     with open(json_path) as f:
         data = json.load(f)
@@ -35,13 +34,20 @@ def load_test_keypoint(json_path: str):
     frames = data.get("frames", [])
     IMG_W, IMG_H = 1920.0, 1080.0
 
+    # OpenPose → MediaPipe 순서 매핑
+    OPENPOSE_TO_MEDIAPIPE_POSE = [
+        0,16,16,16,15,15,15,18,17,0,0,5,2,6,3,7,4,7,4,7,4,7,4,12,9
+    ]
+
     result = []
     for frame in frames:
         if frame.get("is_gongsu", False):
             continue
-        pose       = [v / (IMG_W if j % 2 == 0 else IMG_H)
-                      for joint in frame.get("pose", [])
-                      for j, v in enumerate(joint[:2])]
+
+        # pose: MediaPipe 순서 그대로 (클라이언트가 이미 MediaPipe 순서로 줌)
+        pose = [v / (IMG_W if j % 2 == 0 else IMG_H)
+                for joint in frame.get("pose", [])
+                for j, v in enumerate(joint[:2])]
         left_hand  = [v / (IMG_W if j % 2 == 0 else IMG_H)
                       for joint in frame.get("left_hand", [])
                       for j, v in enumerate(joint[:2])]
@@ -56,8 +62,8 @@ def load_test_keypoint(json_path: str):
 
 def main():
     # ── 설정 ──────────────────────────────────────
-    TARGET_WORD_ID = 78        # 테스트한 단어 word_id (두부면 해당 id로 변경)
-    TEST_JSON_PATH = "user1_word78_20260513_024156.json"  # 운용서버에서 저장한 JSON 경로
+    TARGET_WORD_ID = 118        # 테스트한 단어 word_id (두부면 해당 id로 변경)
+    TEST_JSON_PATH = "user1_word118_20260514_072659.json"  # 운용서버에서 저장한 JSON 경로
     # ──────────────────────────────────────────────
 
     # 학습 샘플 로드
