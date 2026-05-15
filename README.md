@@ -88,13 +88,13 @@ ai_server/
 
 ### 시각화
 
-![Version Accuracy](portfolio_images/01_version_accuracy.png)
+![Version Accuracy](ai_server/portfolio_images/01_version_accuracy.png)
 
-![Training Curve](portfolio_images/02_training_curve.png)
+![Training Curve](ai_server/portfolio_images/02_training_curve.png)
 
-![Joint Order Mismatch](portfolio_images/03_joint_order_mismatch.png)
+![Joint Order Mismatch](ai_server/portfolio_images/03_joint_order_mismatch.png)
 
-![False Positive Analysis](portfolio_images/04_fp_analysis.png)
+![False Positive Analysis](ai_server/portfolio_images/04_fp_analysis.png)
 
 
 
