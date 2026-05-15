@@ -1,6 +1,7 @@
 #include "VideoPlayer.h"
 
 #include <QDebug>
+#include <QEvent>
 #include <QFile>
 #include <QDir>
 #include <QUrl>
@@ -86,6 +87,9 @@ VideoPlayer::VideoPlayer(QWidget *parent)
 
     // ── QMediaPlayer 설정 ────────────────────────────
     m_player->setVideoOutput(m_videoWidget);
+
+    // 영상 부분 클릭 → 재생/일시정지
+    m_videoWidget->installEventFilter(this);
 
     connect(m_player, &QMediaPlayer::mediaStatusChanged,
             this,     &VideoPlayer::onMediaStatusChanged);
@@ -179,6 +183,23 @@ void VideoPlayer::setSpeed(double speed)
 // ─────────────────────────────────────────────────────────────
 // togglePlayPause
 // ─────────────────────────────────────────────────────────────
+bool VideoPlayer::eventFilter(QObject *obj, QEvent *event)
+{
+    if (obj == m_videoWidget && event->type() == QEvent::MouseButtonPress) {
+        if (m_playBtn->isEnabled())   // 버퍼 준비 완료 후에만 동작
+            togglePlayPause();
+        return true;
+    }
+    return QWidget::eventFilter(obj, event);
+}
+
+void VideoPlayer::resetToStart()
+{
+    m_player->setPosition(0);
+    m_player->pause();
+    m_playBtn->setText("▶");
+}
+
 void VideoPlayer::togglePlayPause()
 {
     if (m_player->playbackState() == QMediaPlayer::PlayingState)

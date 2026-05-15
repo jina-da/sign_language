@@ -59,6 +59,16 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_kpClient, &KeypointClient::frameReady,
             m_testWidget, &TestWidget::onCameraFrame);
 
+    // connectionChanged: 카메라 연결 상태를 각 위젯에 전달
+    connect(m_kpClient, &KeypointClient::connectionChanged,
+            m_studyWidget,  &StudyWidget::setCameraConnected);
+    connect(m_kpClient, &KeypointClient::connectionChanged,
+            m_reviewWidget, &ReviewWidget::setCameraConnected);
+    connect(m_kpClient, &KeypointClient::connectionChanged,
+            m_dictWidget,   &DictWidget::setCameraConnected);
+    connect(m_kpClient, &KeypointClient::connectionChanged,
+            m_testWidget,   &TestWidget::setCameraConnected);
+
     // keypointReady: contentStack 현재 위젯에만 전달
     connect(m_kpClient, &KeypointClient::keypointReady,
             this, [this](const QJsonObject &kp){
@@ -104,23 +114,21 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     m_kpClient->disconnectFromServer();
+    stopKeypointServer();
+    delete ui;
+}
 
-    // keypoint_server 프로세스 종료
+void MainWindow::stopKeypointServer()
+{
     if (m_keypointProcess && m_keypointProcess->state() != QProcess::NotRunning) {
-        // bat 파일로 실행한 경우 cmd가 python 자식 프로세스를 생성하므로
-        // terminate()만으로는 자식까지 종료되지 않음.
-        // taskkill /F /T: 프로세스 트리 전체를 강제 종료
         qint64 pid = m_keypointProcess->processId();
-        if (pid > 0) {
-            QProcess::execute("taskkill",
-                { "/F", "/T", "/PID", QString::number(pid) });
-        }
+        if (pid > 0)
+            QProcess::execute("taskkill", { "/F", "/T", "/PID", QString::number(pid) });
         m_keypointProcess->terminate();
         if (!m_keypointProcess->waitForFinished(2000))
             m_keypointProcess->kill();
+        qDebug() << "[KP] keypoint_server 종료 완료";
     }
-
-    delete ui;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -197,6 +205,13 @@ void MainWindow::switchTab(int index)
         m_navBtns[i]->setStyleSheet(i == index ? active : inactive);
 
     ui->contentStack->setCurrentIndex(index);
+
+    // 탭 전환 시 현재 카메라 연결 상태를 해당 위젯에 즉시 전달
+    bool camConnected = m_kpClient->isConnected();
+    if (index == 1) m_studyWidget->setCameraConnected(camConnected);
+    else if (index == 2) m_reviewWidget->setCameraConnected(camConnected);
+    else if (index == 3) m_dictWidget->setCameraConnected(camConnected);
+    else if (index == 6) m_testWidget->setCameraConnected(camConnected);
 }
 
 void MainWindow::setUserInfo(const QString &username, bool)
@@ -278,6 +293,17 @@ void MainWindow::startKeypointServer()
         qDebug() << "[KP] keypoint_server 이미 실행 중";
         return;
     }
+
+    // 이전 실행에서 정상 종료되지 않은 keypoint_server 프로세스 정리
+    // python.exe가 keypoint_server.py를 실행하므로 포트 점유 기준으로 종료
+    qDebug() << "[KP] 포트 7000 점유 프로세스 정리 중...";
+    QProcess findPort;
+    findPort.start("cmd", { "/c",
+        "for /f \"tokens=5\" %a in "
+        "('netstat -ano ^| findstr :7000 ^| findstr LISTENING') "
+        "do taskkill /F /PID %a" });
+    findPort.waitForFinished(3000);
+    qDebug() << "[KP] 기존 프로세스 정리 완료";
 
     QString serverDir = QCoreApplication::applicationDirPath()
                         + "/keypoint_server";

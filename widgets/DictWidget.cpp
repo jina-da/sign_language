@@ -3,6 +3,7 @@
 
 #include <QDebug>
 #include <QKeyEvent>
+#include <QHideEvent>
 #include <QJsonArray>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -92,8 +93,8 @@ void DictWidget::switchTab(int index)
         m_isRecording    = false;
         m_keypointBuffer = QJsonArray();
         m_stopTimer->stop();
-        ui->recordingLabel->hide();
-        ui->statusLabel->setText("공수 자세를 취하면 자동으로 시작됩니다");
+        ui->recordingLabel->setText("");
+        ui->statusLabel->setText("녹화 버튼을 눌러 시작하세요");
         ui->reverseResultCard->hide();
     }
 
@@ -318,7 +319,7 @@ void DictWidget::showReverseResult(const QString &word,
     ui->reverseResultCard->show();
     ui->reverseWordLabel->setText(word);
     ui->reverseDescLabel->setText(description);
-    ui->statusLabel->setText("인식 완료! 다시 수화를 입력하면 새로 검색합니다.");
+    ui->statusLabel->setText("");
     qDebug() << "[Dict] 역방향 결과:" << word;
 }
 
@@ -396,8 +397,10 @@ void DictWidget::startRecording()
     m_hasPrevKeypoint   = false;
     m_recordingStartTime.start();
 
-    ui->recordingLabel->show();
-    ui->statusLabel->setText("녹화 중... 수화를 입력하고 공수 자세로 종료하세요.");
+    ui->recordingLabel->setStyleSheet("font-size:13px; color:#E24B4A; font-weight:500;");
+    ui->recordingLabel->setText("● 녹화 중");
+    ui->statusLabel->setText("녹화 중... 수화를 입력하세요. 움직임이 멈추면 자동 종료됩니다.");
+        ui->recordBtn->setStyleSheet("QPushButton { background: #E24B4A; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
     ui->reverseResultCard->hide();
     m_stopTimer->start();
     qDebug() << "[Dict] 역방향 녹화 시작";
@@ -411,8 +414,8 @@ void DictWidget::stopRecording()
     if (!m_isRecording) return;
     m_isRecording = false;
     m_stopTimer->stop();
-    ui->recordingLabel->hide();
-    ui->recordBtn->setText("⏺ 녹화");
+    ui->recordingLabel->setText("");
+    ui->recordBtn->setText("● 녹화");
     ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
 
     int frameCount = m_keypointBuffer.size();
@@ -428,6 +431,14 @@ void DictWidget::stopRecording()
 }
 
 
+void DictWidget::hideEvent(QHideEvent *event)
+{
+    // 탭 이동 시 결과 영상 모두 처음으로 되돌리고 일시정지
+    for (VideoPlayer *vp : m_resultPlayers)
+        vp->resetToStart();
+    QWidget::hideEvent(event);
+}
+
 void DictWidget::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
@@ -438,26 +449,35 @@ void DictWidget::keyPressEvent(QKeyEvent *event)
 
 void DictWidget::onRecordBtnClicked()
 {
-    if (m_countdownTimer->isActive() && m_countdown > 0) {
-        m_countdownTimer->stop(); m_countdown = 0;
+    if (!m_isRecording && !m_countdownTimer->isActive() && !m_cameraConnected) {
+        ui->statusLabel->setText("카메라가 연결되지 않았습니다. 잠시 후 다시 시도하세요.");
+        return;
+    }
+    if (m_countdownTimer->isActive()) {
+        m_countdownTimer->stop();
+        m_countdown = 0;
+        ui->recordingLabel->setText("");
         ui->statusLabel->setText("녹화가 취소됐습니다.");
-        ui->recordBtn->setText("⏺ 녹화");
-    ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
+        ui->recordBtn->setText("● 녹화");
+        ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
         return;
     }
     if (m_isRecording) {
         m_isRecording = false; m_stopTimer->stop();
         m_keypointBuffer = QJsonArray();
-        ui->recordingLabel->hide();
-        ui->recordBtn->setText("⏺ 녹화");
+        ui->recordingLabel->setText("");
+        ui->recordBtn->setText("● 녹화");
     ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
         ui->statusLabel->setText("녹화가 중단됐습니다.");
         qDebug() << "[Dict] 녹화 중단";
         return;
     }
     m_countdown = 3;
-    ui->statusLabel->setText("3초 후 녹화 시작...");
+    ui->recordingLabel->setText(QString::number(m_countdown));
+    ui->recordingLabel->setStyleSheet("font-size:28px; font-weight:700; color:#3B6D11;");
+    ui->statusLabel->setText("잠시 후 녹화가 시작됩니다...");
     ui->recordBtn->setText("■ 취소");
+    ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
     m_countdownTimer->start();
     qDebug() << "[Dict] 카운트다운 시작";
 }
@@ -465,9 +485,11 @@ void DictWidget::onRecordBtnClicked()
 void DictWidget::onCountdownTick()
 {
     m_countdown--;
-    ui->statusLabel->setText(QString("%1초 후 녹화 시작...").arg(m_countdown));
-    if (m_countdown <= 0) {
+    if (m_countdown > 0) {
+        ui->recordingLabel->setText(QString::number(m_countdown));
+    } else {
         m_countdownTimer->stop();
+        ui->recordingLabel->setText("");
         startRecording();
     }
 }

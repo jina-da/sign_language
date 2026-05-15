@@ -147,7 +147,7 @@ AppController::AppController(QObject *parent)
         // StudyWidget::WordInfo → TestWidget::WordInfo 변환
         QList<TestWidget::WordInfo> testWords;
         for (const auto &w : words)
-            testWords.append({w.id, w.word, w.meaning});
+            testWords.append({w.id, w.word, w.meaning, w.videoCdnUrl});
 
         m_mainWindow->testWidget()->setWordList(testWords);
         m_mainWindow->showTestTab();
@@ -346,6 +346,13 @@ AppController::AppController(QObject *parent)
     qDebug() << "[App] constructor done";
 }
 
+void AppController::cleanup()
+{
+    // MainWindow 소멸자가 호출되지 않는 경우(강제 종료, 크래시 등)를 대비
+    if (m_mainWindow)
+        m_mainWindow->stopKeypointServer();
+}
+
 void AppController::start()
 {
     qDebug() << "[App] start()";
@@ -412,6 +419,10 @@ void AppController::onMessageReceived(const QJsonObject &msg)
 
             // VideoPlayer 세션 세팅
             m_mainWindow->studyWidget()->videoPlayer()->setSession(
+                SERVER_HOST, m_sessionToken);
+            m_mainWindow->reviewWidget()->videoPlayer()->setSession(
+                SERVER_HOST, m_sessionToken);
+            m_mainWindow->testWidget()->videoPlayer()->setSession(
                 SERVER_HOST, m_sessionToken);
             m_mainWindow->dictWidget()->setSession(
                 SERVER_HOST, m_sessionToken);
@@ -484,26 +495,33 @@ void AppController::onMessageReceived(const QJsonObject &msg)
     // ── 204: 추론 결과 응답 ───────────────────────────
     else if (type == "RES_INFER") {
         bool   isCorrect = msg["result"].toBool();
-        double accuracy  = msg["accuracy"].toDouble() * 100.0;
+        double accuracy  = msg["accuracy"].toDouble();   // 0.0~1.0
         int    wordId    = msg["word_id"].toInt();
 
+        // 판정 로직
+        // - is_correct = false           → incorrect (✗)
+        // - is_correct = true, < 0.8    → partial   (△)
+        // - is_correct = true, >= 0.8   → correct   (○)
         QString verdict;
-        if (isCorrect)             verdict = "correct";
-        else if (accuracy >= 50.0) verdict = "partial";
-        else                       verdict = "incorrect";
+        if (!isCorrect)             verdict = "incorrect";
+        else if (accuracy < 0.8)    verdict = "partial";
+        else                        verdict = "correct";
+
+        double accuracyPct = accuracy * 100.0;
 
         // 현재 활성 위젯에 따라 결과 전달
         QWidget *current = m_mainWindow->currentWidget();
         if (current == m_mainWindow->testWidget()) {
             m_mainWindow->testWidget()->showResult(
-                isCorrect, msg["accuracy"].toDouble(), wordId);
+                isCorrect, accuracy, wordId);
         } else if (current == m_mainWindow->reviewWidget()) {
-            m_mainWindow->reviewWidget()->showResult(verdict, accuracy, wordId);
+            m_mainWindow->reviewWidget()->showResult(verdict, accuracyPct, wordId);
         } else {
-            m_mainWindow->studyWidget()->showResult(verdict, accuracy, wordId);
+            m_mainWindow->studyWidget()->showResult(verdict, accuracyPct, wordId);
         }
         qDebug() << "[App] RES_INFER: result=" << isCorrect
-                 << "accuracy=" << accuracy << "%";
+                 << "accuracy=" << accuracyPct << "%"
+                 << "verdict=" << verdict;
     }
 
     // ── 206: 복습 단어 응답 ───────────────────────────
@@ -535,7 +553,7 @@ void AppController::onMessageReceived(const QJsonObject &msg)
         // ReviewWidget::WordInfo로 변환
         QList<ReviewWidget::WordInfo> reviewWords;
         for (const auto &w : words)
-            reviewWords.append({w.id, w.word, w.meaning, w.difficulty});
+            reviewWords.append({w.id, w.word, w.meaning, w.difficulty, w.videoCdnUrl});
         m_mainWindow->reviewWidget()->setWordList(reviewWords);
     }
 

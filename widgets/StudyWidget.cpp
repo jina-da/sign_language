@@ -4,7 +4,9 @@
 #include <QButtonGroup>
 #include <QDebug>
 #include <QKeyEvent>
+#include <QHideEvent>
 #include <QJsonArray>
+#include <QMediaPlayer>
 
 StudyWidget::StudyWidget(QWidget *parent)
     : QWidget(parent)
@@ -45,8 +47,8 @@ StudyWidget::StudyWidget(QWidget *parent)
     // VideoPlayer 고정 높이 (cameraView와 동일하게)
     m_videoPlayer->setFixedHeight(240);
 
-    // resultCard 초기 숨김 (btnRow 안에 있으므로 공간은 유지됨)
-    ui->resultCard->setVisible(false);
+    // resultCard 초기 숨김 (btnRow 안에 배치됨)
+    ui->resultCard->setStyleSheet("QWidget#resultCard { background: transparent; border: none; }"); ui->verdictLabel->setText(""); ui->confidenceLabel->setText("");
 
     // 재생 완료 시 다시 보기 버튼 활성화
     connect(m_videoPlayer, &VideoPlayer::playbackFinished,
@@ -149,10 +151,18 @@ void StudyWidget::loadWord(int index)
     ui->meaningLabel->setText(w.meaning);
     updateProgress();
 
-    // 결과 카드 숨김 (statusRow 안에 있으므로 레이아웃 변동 없음)
-    ui->resultCard->setVisible(false);
-    ui->nextBtn->setEnabled(false);
-    ui->nextBtn->setText("다음 단어 →");
+    // 결과 카드 숨김
+    ui->resultCard->setStyleSheet("QWidget#resultCard { background: transparent; border: none; }"); ui->verdictLabel->setText(""); ui->confidenceLabel->setText("");
+
+    bool isLastWord = (index == m_words.size() - 1);
+    if (isLastWord) {
+        // 마지막 단어: 녹화 없이도 테스트로 넘어갈 수 있도록 버튼 활성화
+        ui->nextBtn->setEnabled(true);
+        ui->nextBtn->setText("테스트 시작 →");
+    } else {
+        ui->nextBtn->setEnabled(false);
+        ui->nextBtn->setText("다음 단어 →");
+    }
 
     // 이전 단어 버튼: 첫 번째 단어이면 비활성화
     ui->prevBtn->setEnabled(index > 0);
@@ -166,12 +176,12 @@ void StudyWidget::loadWord(int index)
     m_cooldownTimer->stop();
     m_countdown = 0;
 
-    ui->recordingLabel->hide();
+    ui->recordingLabel->setText("");
     ui->countdownLabel->setText("");
     ui->recordBtn->setText("● 녹화");
     ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
     ui->statusLabel->setText(
-        "녹화 버튼을 누르거나 스페이스바를 눌러 시작하세요");
+        "녹화 버튼을 눌러 시작하세요");
 
     // 영상 자동 재생
     if (!w.videoCdnUrl.isEmpty()) {
@@ -268,7 +278,8 @@ void StudyWidget::startRecording()
     m_hasPrevKeypoint   = false;   // 이전 프레임 초기화
     m_recordingStartTime.start();
 
-    ui->recordingLabel->show();
+    ui->recordingLabel->setStyleSheet("font-size:13px; color:#E24B4A; font-weight:500;");
+    ui->recordingLabel->setText("● 녹화 중");
     ui->recordBtn->setText("■ 중단");
     ui->recordBtn->setStyleSheet("QPushButton { background: #E24B4A; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
     ui->statusLabel->setText("녹화 중... 수화를 입력하세요.\n움직임이 멈추면 자동 종료됩니다.");
@@ -287,7 +298,7 @@ void StudyWidget::stopRecording()
     if (!m_isRecording) return;
     m_isRecording = false;
     m_stopTimer->stop();
-    ui->recordingLabel->hide();
+    ui->recordingLabel->setText("");
     ui->recordBtn->setText("● 녹화");
     ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
 
@@ -328,23 +339,19 @@ void StudyWidget::showResult(const QString &verdict,
 {
     Q_UNUSED(predictedWordId)
 
-    // 결과 카드 표시
-    ui->resultCard->setVisible(true);
-    ui->confidenceLabel->setText(
-        QString("신뢰도: %1%").arg(confidence, 0, 'f', 1));
-
+    ui->confidenceLabel->setVisible(false);   // 신뢰도 숨김
     applyVerdictStyle(verdict);
 
-    bool isCorrect = (verdict == "correct");
     ui->nextBtn->setEnabled(true);
-    ui->nextBtn->setText(isCorrect ? "다음 단어 →" : "다시 시도");
+    bool isLastWord = (m_currentIndex == m_words.size() - 1);
+    ui->nextBtn->setText(isLastWord ? "테스트 시작 →" : "다음 단어 →");
 
-    if (isCorrect)
+    if (verdict == "correct")
         ui->statusLabel->setText("정확합니다! 다음 단어로 이동하세요.");
     else if (verdict == "partial")
-        ui->statusLabel->setText("거의 맞았습니다! 다시 시도하거나 넘어가세요.");
+        ui->statusLabel->setText("맞았지만 정확도가 낮습니다. 다시 시도해 보세요.");
     else
-        ui->statusLabel->setText("다시 시도해 보세요. [스페이스바]로 재녹화");
+        ui->statusLabel->setText("다시 시도해 보세요.");
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -353,19 +360,19 @@ void StudyWidget::showResult(const QString &verdict,
 void StudyWidget::applyVerdictStyle(const QString &verdict)
 {
     if (verdict == "correct") {
-        ui->verdictLabel->setText("✓ 정답!");
+        ui->verdictLabel->setText("○ 정답!");
         ui->resultCard->setStyleSheet(
             "QWidget#resultCard { background:#D5F5E3; border-radius:12px; border:1px solid #82E0AA; }");
         ui->verdictLabel->setStyleSheet(
             "font-size:20px; font-weight:500; color:#1E8449;");
     } else if (verdict == "partial") {
-        ui->verdictLabel->setText("△ 거의 맞았어요");
+        ui->verdictLabel->setText("△ 다시 시도");
         ui->resultCard->setStyleSheet(
             "QWidget#resultCard { background:#FEF9E7; border-radius:12px; border:1px solid #F9E79F; }");
         ui->verdictLabel->setStyleSheet(
             "font-size:20px; font-weight:500; color:#B7950B;");
     } else {
-        ui->verdictLabel->setText("✗ 다시 시도");
+        ui->verdictLabel->setText("✗ 오답입니다");
         ui->resultCard->setStyleSheet(
             "QWidget#resultCard { background:#FDEDEC; border-radius:12px; border:1px solid #F1948A; }");
         ui->verdictLabel->setStyleSheet(
@@ -403,12 +410,7 @@ void StudyWidget::onPrevClicked()
 // ─────────────────────────────────────────────────────────────
 void StudyWidget::onNextClicked()
 {
-    if (ui->nextBtn->text() == "다시 시도") {
-        loadWord(m_currentIndex);
-        return;
-    }
-
-    // 마지막 단어 완료 후 "테스트 시작 →" 버튼을 누른 경우 (학습 모드)
+    // 마지막 단어 완료 후 "테스트 시작 →" 버튼을 누른 경우
     if (ui->nextBtn->text() == "테스트 시작 →") {
         emit testRequested(m_words);
         return;
@@ -435,12 +437,9 @@ void StudyWidget::showCompletionDialog()
         QString("%1 / %2").arg(m_words.size()).arg(m_words.size()));
 
     ui->skipBtn->setEnabled(false);
-    ui->prevBtn->setEnabled(false);
     ui->nextBtn->setText("테스트 시작 →");
     ui->nextBtn->setEnabled(true);
-    ui->statusLabel->setText(
-        QString("학습 완료! 단어 %1개를 모두 학습했습니다. 테스트를 시작하세요.")
-        .arg(m_words.size()));
+    ui->statusLabel->setText("학습 완료! 테스트를 시작하세요.");
     qDebug() << "[Study] 학습 완료 → 테스트 시작 버튼 활성화";
 }
 
@@ -468,21 +467,66 @@ void StudyWidget::onSkipClicked()
 void StudyWidget::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
+        // 영상 재생 중이면 스페이스바를 영상 재생/일시정지로 처리
+        if (m_videoPlayer &&
+            m_videoPlayer->player()->playbackState() == QMediaPlayer::PlayingState) {
+            m_videoPlayer->togglePlayPause();
+            return;
+        }
         onRecordBtnClicked();
         return;
     }
     QWidget::keyPressEvent(event);
 }
 
-void StudyWidget::onRecordBtnClicked()
+void StudyWidget::hideEvent(QHideEvent *event)
 {
-    // 카운트다운 진행 중(m_countdown > 0)일 때만 취소 처리
-    // m_countdown == 0이면 tick이 이벤트 큐에 남아있는 순간이므로 취소하지 않음
-    if (m_countdownTimer->isActive() && m_countdown > 0) {
-        // 카운트다운 중 취소
+    // 탭 전환 등으로 위젯이 숨겨질 때 카운트다운/녹화 상태 초기화
+    if (m_countdownTimer->isActive()) {
         m_countdownTimer->stop();
         m_countdown = 0;
         ui->countdownLabel->setText("");
+        ui->recordBtn->setText("● 녹화");
+        ui->recordBtn->setStyleSheet(
+            "QPushButton { background: #3B6D11; color: white; border: none;"
+            " border-radius: 20px; font-size: 13px; font-weight: 500;"
+            " padding: 8px 24px; min-width: 100px; }");
+        ui->statusLabel->setText("녹화 버튼을 눌러 시작하세요");
+    }
+    if (m_isRecording) {
+        m_stopTimer->stop();
+        m_isRecording = false;
+        m_keypointBuffer = QJsonArray();
+        ui->recordingLabel->setText("");
+        ui->recordBtn->setText("● 녹화");
+        ui->recordBtn->setStyleSheet(
+            "QPushButton { background: #3B6D11; color: white; border: none;"
+            " border-radius: 20px; font-size: 13px; font-weight: 500;"
+            " padding: 8px 24px; min-width: 100px; }");
+    }
+    m_cooldownTimer->stop();
+
+    // 탭 이동 시 영상을 처음으로 되돌리고 일시정지
+    if (m_videoPlayer)
+        m_videoPlayer->resetToStart();
+
+    QWidget::hideEvent(event);
+}
+
+void StudyWidget::onRecordBtnClicked()
+{
+    // 녹화/카운트다운 중이 아닐 때만 카메라 연결 체크
+    if (!m_isRecording && !m_countdownTimer->isActive() && !m_cameraConnected) {
+        ui->statusLabel->setText("카메라가 연결되지 않았습니다.\n잠시 후 다시 시도하세요.");
+        return;
+    }
+
+    // 카운트다운 진행 중 취소
+    if (m_countdownTimer->isActive()) {
+        m_countdownTimer->stop();
+        m_countdown = 0;
+        ui->countdownLabel->setText("");
+        ui->recordingLabel->setText("");
         ui->statusLabel->setText("녹화가 취소됐습니다.");
         ui->recordBtn->setText("● 녹화");
         ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
@@ -494,17 +538,19 @@ void StudyWidget::onRecordBtnClicked()
         m_isRecording = false;
         m_stopTimer->stop();
         m_keypointBuffer = QJsonArray();
-        ui->recordingLabel->hide();
+        ui->recordingLabel->setText("");
         ui->recordBtn->setText("● 녹화");
         ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
-        ui->statusLabel->setText("녹화가 중단됐습니다. 다시 시작하려면 버튼을 누르세요.");
+        ui->statusLabel->setText("녹화가 중단됐습니다.\n다시 시작하려면 버튼을 누르세요.");
         qDebug() << "[Study] 녹화 중단 (전송 안 함)";
         return;
     }
 
-    // 카운트다운 시작 — 버튼은 초록 유지, 색상은 실제 녹화 시작 시점에 빨간색으로 변경
+    // 카운트다운 시작 — recordingLabel에 큰 글씨로 숫자 표시
     m_countdown = 3;
-    ui->countdownLabel->setText(QString::number(m_countdown));
+    ui->countdownLabel->setText("");
+    ui->recordingLabel->setText(QString::number(m_countdown));
+    ui->recordingLabel->setStyleSheet("font-size:28px; font-weight:700; color:#3B6D11;");
     ui->statusLabel->setText("잠시 후 녹화가 시작됩니다...");
     ui->recordBtn->setText("■ 취소");
     ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
@@ -516,11 +562,11 @@ void StudyWidget::onCountdownTick()
 {
     m_countdown--;
     if (m_countdown > 0) {
-        ui->countdownLabel->setText(QString::number(m_countdown));
+        ui->recordingLabel->setText(QString::number(m_countdown));
     } else {
         // 카운트다운 완료 → 녹화 시작
         m_countdownTimer->stop();
-        ui->countdownLabel->setText("");
+        ui->recordingLabel->setText("");
         startRecording();
     }
 }

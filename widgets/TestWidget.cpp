@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QKeyEvent>
 #include <QJsonArray>
+#include <QVBoxLayout>
 
 TestWidget::TestWidget(QWidget *parent)
     : QWidget(parent)
@@ -36,6 +37,23 @@ TestWidget::TestWidget(QWidget *parent)
 
     // resultCard 초기 숨김
     ui->resultCard->setVisible(false);
+
+    // ── VideoPlayer 위젯 교체 ──────────────────────────────
+    m_videoPlayer = new VideoPlayer(this);
+    m_videoPlayer->setFixedHeight(240);
+    QLayout *videoLayout = ui->videoPlayer->parentWidget()->layout();
+    if (auto *vbox = qobject_cast<QVBoxLayout *>(videoLayout)) {
+        for (int i = 0; i < vbox->count(); ++i) {
+            if (vbox->itemAt(i)->widget() == ui->videoPlayer) {
+                vbox->insertWidget(i, m_videoPlayer);
+                break;
+            }
+        }
+    } else {
+        videoLayout->removeWidget(ui->videoPlayer);
+        videoLayout->addWidget(m_videoPlayer);
+    }
+    ui->videoPlayer->hide();
 
     // 1.5초 정지 감지 타이머 (StudyWidget과 동일)
     m_stopTimer->setSingleShot(true);
@@ -96,14 +114,18 @@ void TestWidget::loadWord(int index)
 
     const WordInfo &w = m_words[index];
 
-    // 뜻만 표시, 정답 단어는 결과 나올 때까지 숨김
+    // 단어를 상단에 표시, 뜻은 그 아래
+    ui->meaningHintLabel->setText(w.word);
     ui->meaningLabel->setText(w.meaning);
     ui->answerLabel->setText(w.word);
     ui->answerLabel->hide();
 
-    // 영상 플레이어 초기화 (VideoPlayer 연동 전 텍스트로 표시)
-    ui->videoPlayer->setText(
-        QString("정답/오답 시 [%1] 영상이 재생됩니다").arg(w.word));
+    // 영상 플레이어 — 단어 로드 시에도 미리 로드 (정답/오답 시 즉시 재생 가능)
+    if (!w.videoCdnUrl.isEmpty()) {
+        QString filename = w.videoCdnUrl.section('/', -1);
+        m_videoPlayer->setCurrentWordId(w.id);
+        m_videoPlayer->play(w.videoCdnUrl, filename);
+    }
 
     updateProgress();
 
@@ -119,10 +141,10 @@ void TestWidget::loadWord(int index)
     m_cooldownTimer->stop();
     m_countdown = 0;
 
-    ui->recordingLabel->hide();
+    ui->recordingLabel->setText("");
     ui->recordBtn->setText("● 녹화");
     ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
-    ui->statusLabel->setText("공수 자세를 취하면 자동으로 녹화가 시작됩니다");
+    ui->statusLabel->setText("녹화 버튼을 눌러 시작하세요");
 
     qDebug() << "[Test] 문제 로드:" << w.meaning
              << "(" << index+1 << "/" << m_words.size() << ")";
@@ -185,10 +207,10 @@ void TestWidget::startRecording()
     m_hasPrevKeypoint   = false;
     m_recordingStartTime.start();
 
-    ui->recordingLabel->show();
+    ui->recordingLabel->setText("● 녹화 중");
     ui->recordBtn->setText("■ 중단");
     ui->recordBtn->setStyleSheet("QPushButton { background: #E24B4A; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
-    ui->statusLabel->setText("녹화 중... 수화를 입력하세요.\n움직임이 멈추면 자동 종료됩니다.");
+    ui->statusLabel->setText("녹화 중... 수화를 입력하세요. 움직임이 멈추면 자동 종료됩니다.");
     qDebug() << "[Test] 녹화 시작";
 }
 
@@ -200,7 +222,7 @@ void TestWidget::stopRecording()
     if (!m_isRecording) return;
     m_isRecording = false;
     m_stopTimer->stop();
-    ui->recordingLabel->hide();
+    ui->recordingLabel->setText("");
     ui->recordBtn->setText("● 녹화");
     ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
 
@@ -230,6 +252,10 @@ void TestWidget::keyPressEvent(QKeyEvent *event)
 
 void TestWidget::onRecordBtnClicked()
 {
+    if (!m_isRecording && !m_countdownTimer->isActive() && !m_cameraConnected) {
+        ui->statusLabel->setText("카메라가 연결되지 않았습니다. 잠시 후 다시 시도하세요.");
+        return;
+    }
     if (m_countdownTimer->isActive() && m_countdown > 0) {
         m_countdownTimer->stop(); m_countdown = 0;
         ui->statusLabel->setText("녹화가 취소됐습니다.");
@@ -240,7 +266,7 @@ void TestWidget::onRecordBtnClicked()
     if (m_isRecording) {
         m_isRecording = false; m_stopTimer->stop();
         m_keypointBuffer = QJsonArray();
-        ui->recordingLabel->hide();
+        ui->recordingLabel->setText("");
         ui->recordBtn->setText("● 녹화");
     ui->recordBtn->setStyleSheet("QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
         ui->statusLabel->setText("녹화가 중단됐습니다.");
@@ -313,21 +339,16 @@ void TestWidget::showResult(bool isCorrect, double accuracy, int wordId)
 }
 
 // ─────────────────────────────────────────────────────────────
-// triggerVideoPlay — 정답/오답 시 영상 자동재생 요청
-// VideoPlayer 미구현 상태에서는 videoPlayer 텍스트만 업데이트
-// ─────────────────────────────────────────────────────────────
+// triggerVideoPlay — 정답/오답 시 영상 재생
 void TestWidget::triggerVideoPlay()
 {
     if (m_words.isEmpty() || m_currentIndex >= m_words.size()) return;
-
     const WordInfo &w = m_words[m_currentIndex];
-
-    // VideoPlayer 연동 전: 텍스트로 상태 표시
-    ui->videoPlayer->setText(
-        QString("[%1] 영상 재생 중... (VideoPlayer 연동 예정)").arg(w.word));
-
-    // VideoPlayer 연동 후에는 이 시그널로 재생 요청
-    emit videoPlayRequested(w.id, m_playSpeed);
+    if (!w.videoCdnUrl.isEmpty()) {
+        QString filename = w.videoCdnUrl.section('/', -1);
+        m_videoPlayer->setCurrentWordId(w.id);
+        m_videoPlayer->play(w.videoCdnUrl, filename);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────

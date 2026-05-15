@@ -6,6 +6,9 @@ import asyncio
 import json
 import struct
 import sys
+import threading
+import time
+import queue as _queue   # 스레드 안전
 import cv2
 import mediapipe as mp
 from mediapipe.tasks import python as mp_python
@@ -76,18 +79,38 @@ pose_landmarker = PoseLandmarker.create_from_options(pose_options)
 print("[MediaPipe] 초기화 완료")
 
 # ── 패킷 전송 헬퍼 ───────────────────────────────────────────
+MAX_WRITE_BUFFER = 2 * 1024 * 1024  # 2MB — 초과 시 프레임 건너뜀
+
 async def send_packet(writer, data: bytes):
     header = struct.pack(">I", len(data))
     writer.write(header + data)
-    await writer.drain()
+    # drain() 제거: Qt가 느리게 읽을 때 예외 발생으로 연결이 끊기는 문제 방지
+    # write()는 내부 버퍼에 쌓기만 하므로 예외가 발생하지 않음
 
 async def send_json(writer, obj: dict):
     await send_packet(writer, json.dumps(obj).encode("utf-8"))
 
 async def send_jpeg(writer, frame_bgr):
+    # 버퍼가 가득 찼으면 이 프레임은 건너뜀 (연결은 유지)
+    if writer.transport and writer.transport.get_write_buffer_size() > MAX_WRITE_BUFFER:
+        return
     _, jpeg = cv2.imencode(".jpg", frame_bgr,
                            [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
     await send_packet(writer, jpeg.tobytes())
+
+async def _try_send_jpeg(writer, frame) -> bool:
+    try:
+        await send_jpeg(writer, frame)
+        return True
+    except Exception:
+        return False
+
+async def _try_send_json(writer, obj) -> bool:
+    try:
+        await send_json(writer, obj)
+        return True
+    except Exception:
+        return False
 
 # ── 관절 추출 헬퍼 ───────────────────────────────────────────
 def extract_hand(hand_landmarks, handedness_list, label, img_width, img_height):
@@ -217,8 +240,12 @@ async def handle_control_client(reader, writer):
         print(f"[Control] Qt 연결 종료: {addr}")
 
 # ── 메인 캡처 루프 ────────────────────────────────────────────
+# 원본 구조(단일 asyncio 루프)를 유지한다.
+# cap.read()는 33ms 내에 반환되므로 이벤트 루프 블로킹이 허용 범위 안에 있다.
+# 루프 끝에서 await asyncio.sleep(0)으로 매 프레임마다 이벤트 루프에
+# 제어권을 즉시 양보하여 TCP accept/send가 처리될 수 있도록 한다.
 async def capture_loop():
-    # 카메라 열기 — 다른 프로세스가 점유 중일 수 있으므로 최대 10회 재시도
+    # 카메라 열기 — 이전 프로세스가 점유 중일 수 있으므로 최대 10회 재시도
     cap = None
     for attempt in range(10):
         cap = cv2.VideoCapture(CAMERA_INDEX)
@@ -234,34 +261,45 @@ async def capture_loop():
 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  FRAME_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
-
-    # 실제 캡처 해상도 읽기 (설정값과 다를 수 있으므로 cap.get으로 확인)
     img_width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     img_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     print(f"[Camera] 캡처 시작 — 해상도: {img_width}x{img_height}")
-    frame_idx     = 0
-    timestamp_ms  = 0
-    fail_count    = 0          # 연속 프레임 실패 횟수
-    MAX_FAIL_LOG  = 5          # 이 횟수까지만 WARN 출력
-    FAIL_SLEEP    = 1.0        # 실패 누적 후 대기 시간(초)
-    FAIL_COOLDOWN = 30         # 이 횟수 이상이면 대기 후 재시도
+
+    frame_idx    = 0
+    timestamp_ms = 0
+    _prev_debug  = None
+    fail_count   = 0
+    FAIL_REOPEN  = 60   # 이 횟수 이상 실패 시 카메라 재오픈 시도
 
     while True:
         ret, frame = cap.read()
         if not ret:
             fail_count += 1
-            if fail_count <= MAX_FAIL_LOG:
+            if fail_count <= 5:
                 print(f"[Camera] 프레임 읽기 실패 ({fail_count}회)")
-            elif fail_count == MAX_FAIL_LOG + 1:
-                print(f"[Camera] 프레임 읽기 반복 실패 — 이후 로그 생략, {FAIL_SLEEP}초마다 재시도")
-            # 실패가 누적되면 대기 시간을 늘려 CPU/로그 부담 감소
-            if fail_count >= FAIL_COOLDOWN:
-                await asyncio.sleep(FAIL_SLEEP)
+            elif fail_count == 6:
+                print("[Camera] 반복 실패 — 이후 로그 생략, 재시도 중...")
+
+            # 일정 횟수 이상 실패 시 카메라 재오픈 시도 (연결 해제 후 재연결 대응)
+            if fail_count >= FAIL_REOPEN:
+                print(f"[Camera] {FAIL_REOPEN}회 실패 — 카메라 재오픈 시도...")
+                cap.release()
+                await asyncio.sleep(2.0)
+                cap = cv2.VideoCapture(CAMERA_INDEX)
+                if cap.isOpened():
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  FRAME_WIDTH)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
+                    img_width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                    img_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                    print(f"[Camera] 재오픈 성공 — 해상도: {img_width}x{img_height}")
+                    fail_count = 0
+                else:
+                    print("[Camera] 재오픈 실패 — 계속 대기...")
+                    fail_count = FAIL_REOPEN   # 카운터 유지해서 계속 재시도
             else:
                 await asyncio.sleep(0.01)
             continue
 
-        # 프레임 성공 시 실패 카운터 초기화
         if fail_count > 0:
             print(f"[Camera] 프레임 복구 (실패 {fail_count}회 후)")
             fail_count = 0
@@ -281,7 +319,6 @@ async def capture_loop():
                                       hand_result.handedness, "Right",
                                       img_width, img_height)
 
-        # 우세손 정규화
         left_normalized, right_normalized = normalize_dominant_hand(
             hand_to_list(left_hand_raw),
             hand_to_list(right_hand_raw),
@@ -294,6 +331,19 @@ async def capture_loop():
 
         gongsu = is_gongsu_pose(left_hand_raw, right_hand_raw, pose_lms)
 
+        # 디버그 출력 — 상태 변화 시에만 출력
+        num_hands      = len(hand_result.hand_landmarks) if hand_result.hand_landmarks else 0
+        left_detected  = hand_detected(left_hand_raw)
+        right_detected = hand_detected(right_hand_raw)
+        debug_state    = (num_hands, left_detected, right_detected, gongsu)
+        if debug_state != _prev_debug:
+            print(f"[Debug] 감지된 손 수: {num_hands}")
+            print(f"[Debug] 왼손:{left_detected} 오른손:{right_detected} 공수:{gongsu}")
+            if num_hands > 0 and hand_result.handedness:
+                for i, h in enumerate(hand_result.handedness):
+                    print(f"  손{i}: category_name={h[0].category_name} score={h[0].score:.2f}")
+            _prev_debug = debug_state
+
         keypoint_data = {
             "frame_idx":  frame_idx,
             "left_hand":  left_hand,
@@ -302,27 +352,7 @@ async def capture_loop():
             "is_gongsu":  gongsu
         }
 
-        # 디버그: 3초마다 출력
-        if frame_idx % 90 == 0:
-            num_hands = len(hand_result.hand_landmarks)
-            print(f"[Debug] 감지된 손 수: {num_hands}")
-            for i, h in enumerate(hand_result.handedness):
-                print(f"  손{i}: category_name={h[0].category_name} score={h[0].score:.2f}")
-            print(f"[Debug] 왼손:{hand_detected(left_hand_raw)} 오른손:{hand_detected(right_hand_raw)} 공수:{gongsu}")
-            if hand_detected(left_hand_raw) and hand_detected(right_hand_raw):
-                lx, ly = left_hand_raw[0][0], left_hand_raw[0][1]
-                rx, ry = right_hand_raw[0][0], right_hand_raw[0][1]
-                hand_dist = ((lx-rx)**2 + (ly-ry)**2) ** 0.5
-                print(f"  손간거리:{hand_dist:.3f} (기준:0.25)")
-                if len(pose_lms) > 12:
-                    cx=(lx+rx)/2; cy=(ly+ry)/2
-                    sx=(pose_lms[11][0]+pose_lms[12][0])/2
-                    sy=(pose_lms[11][1]+pose_lms[12][1])/2
-                    body_dist = ((cx-sx)**2+(cy-sy)**2)**0.5
-                    print(f"  몸중앙거리:{body_dist:.3f} (기준:0.4)")
-
-        # 프레임 전송 — 화면 표시용은 전송 대역폭 절약을 위해 리사이즈
-        # 키포인트 추출은 원본(1920x1080) 해상도로 수행됨
+        # 프레임 전송 (640x360으로 리사이즈하여 대역폭 절약)
         display_frame = cv2.resize(frame, (DISPLAY_WIDTH, DISPLAY_HEIGHT),
                                    interpolation=cv2.INTER_LINEAR)
         dead = [w for w in frame_writers
@@ -335,23 +365,11 @@ async def capture_loop():
         for w in dead: keypoint_writers.remove(w)
 
         frame_idx += 1
-        await asyncio.sleep(1/30)
+        # 매 프레임 후 이벤트 루프에 제어권 즉시 양보
+        await asyncio.sleep(0)
 
     cap.release()
 
-async def _try_send_jpeg(writer, frame) -> bool:
-    try:
-        await send_jpeg(writer, frame)
-        return True
-    except:
-        return False
-
-async def _try_send_json(writer, obj) -> bool:
-    try:
-        await send_json(writer, obj)
-        return True
-    except:
-        return False
 
 # ── 서버 시작 ─────────────────────────────────────────────────
 async def main():
@@ -374,6 +392,7 @@ async def main():
             control_server.serve_forever(),
             capture_loop()
         )
+
 
 if __name__ == "__main__":
     asyncio.run(main())

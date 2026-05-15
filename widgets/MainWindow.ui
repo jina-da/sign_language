@@ -233,7 +233,7 @@ QLabel#phGame,  QLabel#phSettings { font-size: 16px; color: #888780; }
              <item><widget class="QLabel" name="studyIcon"><property name="text"><string>📖</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item>
              <item><widget class="QLabel" name="studyTitle"><property name="text"><string>학습 모드</string></property></widget></item>
              <item><widget class="QLabel" name="studySub"><property name="text"><string>오늘의 단어 학습</string></property></widget></item>
-             <item><widget class="QLabel" name="studyBadge"><property name="text"><string>7단어 남음</string></property></widget></item>
+             <item><widget class="QLabel" name="studyBadge"><property name="text"><string>10단어 남음</string></property></widget></item>
             </layout>
            </widget>
           </item>
@@ -261,7 +261,7 @@ QLabel#phGame,  QLabel#phSettings { font-size: 16px; color: #888780; }
              <item><widget class="QLabel" name="gameIcon"><property name="text"><string>🎮</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item>
              <item><widget class="QLabel" name="gameTitle"><property name="text"><string>게임 모드</string></property></widget></item>
              <item><widget class="QLabel" name="gameSub"><property name="text"><string>타임어택 · 생존</string></property></widget></item>
-             <item><widget class="QLabel" name="gameBadge"><property name="text"><string>최고 850점</string></property></widget></item>
+             <item><widget class="QLabel" name="gameBadge"><property name="text"><string>최고 0점</string></property></widget></item>
             </layout>
            </widget>
           </item>
@@ -275,7 +275,7 @@ QLabel#phGame,  QLabel#phSettings { font-size: 16px; color: #888780; }
              <item><widget class="QLabel" name="dictIcon"><property name="text"><string>🔍</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item>
              <item><widget class="QLabel" name="dictTitle"><property name="text"><string>수화 사전</string></property></widget></item>
              <item><widget class="QLabel" name="dictSub"><property name="text"><string>정방향 · 역방향</string></property></widget></item>
-             <item><widget class="QLabel" name="dictBadge"><property name="text"><string>1,000단어</string></property></widget></item>
+             <item><widget class="QLabel" name="dictBadge"><property name="text"><string>3,000단어</string></property></widget></item>
             </layout>
            </widget>
           </item>

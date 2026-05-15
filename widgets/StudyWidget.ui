@@ -373,14 +373,32 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }</string>
         <layout class="QHBoxLayout" name="statusRow">
          <item>
           <widget class="QLabel" name="recordingLabel">
-           <property name="visible">
-            <bool>false</bool>
+           <property name="minimumSize">
+            <size><width>60</width><height>0</height></size>
+           </property>
+           <property name="maximumSize">
+            <size><width>60</width><height>16777215</height></size>
            </property>
            <property name="styleSheet">
             <string>font-size:13px; color:#E24B4A; font-weight:500;</string>
            </property>
            <property name="text">
-            <string>▶ 녹화 중</string>
+            <string/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="statusLabel">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+             <horstretch>1</horstretch><verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="text">
+            <string>녹화 버튼을 눌러 시작하세요</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
            </property>
           </widget>
          </item>
@@ -400,30 +418,12 @@ QPushButton#nextBtn:disabled { background: #B4B2A9; }</string>
            </property>
           </widget>
          </item>
-         <item>
-          <widget class="QLabel" name="statusLabel">
-           <property name="text">
-            <string>녹화 버튼을 누르거나 스페이스바를 눌러 시작하세요</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer>
-           <property name="orientation">
-            <enum>Qt::Orientation::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
                 </layout>
        </item>
        <item>
         <widget class="QWidget" name="resultCard">
+         <property name="minimumHeight"><number>60</number></property>
+         <property name="maximumHeight"><number>60</number></property>
          <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
          <layout class="QVBoxLayout" name="resultLayout">
          <property name="spacing">

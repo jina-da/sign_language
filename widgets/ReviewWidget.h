@@ -8,6 +8,7 @@
 #include <QJsonObject>
 #include <QImage>
 #include <QKeyEvent>
+#include "VideoPlayer.h"
 
 // ReviewWidget은 StudyWidget과 동일한 .ui 파일을 공유한다.
 // uic가 생성하는 클래스명이 Ui::StudyWidget 이므로
@@ -37,6 +38,7 @@ public:
         QString word;
         QString meaning;
         int     difficulty;
+        QString videoCdnUrl;
     };
 
     explicit ReviewWidget(QWidget *parent = nullptr);
@@ -46,10 +48,12 @@ public:
     void showNoWordsMessage(const QString &message);
 
     void onCameraFrame(const QImage &frame);
+    void setCameraConnected(bool connected) { m_cameraConnected = connected; }
     void onKeypointFrame(const QJsonObject &keypoint);
     void showResult(const QString &verdict,
                     double confidence,
                     int predictedWordId);
+    VideoPlayer *videoPlayer() const { return m_videoPlayer; }
 
 signals:
     void keypointReady(int wordId, bool isDominantLeft, const QJsonArray &keypoints);
@@ -68,6 +72,7 @@ private slots:
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private:
     void loadWord(int index);
@@ -79,9 +84,12 @@ private:
 
     Ui::StudyWidget *ui;   // StudyWidget.ui 재사용
 
+    VideoPlayer  *m_videoPlayer = nullptr;
+
     QList<WordInfo> m_words;
     int    m_currentIndex = 0;
-    bool   m_isRecording  = false;
+    bool   m_isRecording     = false;
+    bool   m_cameraConnected = false;
     double m_playSpeed    = 1.0;
 
     QJsonArray    m_keypointBuffer;

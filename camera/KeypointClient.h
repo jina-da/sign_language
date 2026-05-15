@@ -60,9 +60,10 @@ private:
 
     QString  m_host;
     bool     m_connected             = false;
-    bool     m_frameConnected        = false;   // frameSocket 연결 상태
-    bool     m_keypointConnected     = false;   // keypointSocket 연결 상태
+    bool     m_frameConnected        = false;
+    bool     m_keypointConnected     = false;
     bool     m_intentionalDisconnect = false;
+    bool     m_handlingDisconnect    = false;  // abort() 재진입 방지
     bool     m_hasPendingDominant    = false;
     bool     m_pendingDominantLeft   = false;
 

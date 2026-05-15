@@ -105,7 +105,7 @@ QLabel#summaryDetail { font-size: 15px; color: #5F5E5A; }</string>
             <property name="spacing"><number>8</number></property>
             <item>
              <widget class="QLabel" name="meaningHintLabel">
-              <property name="text"><string>아래 뜻에 해당하는 수화를 입력하세요</string></property>
+              <property name="text"><string/></property>
              </widget>
             </item>
             <item>

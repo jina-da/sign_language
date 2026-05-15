@@ -24,6 +24,7 @@ class AppController : public QObject
 public:
     explicit AppController(QObject *parent = nullptr);
     void start();
+    void cleanup();   // 앱 종료 시 리소스 정리
 
 private slots:
     void onMessageReceived(const QJsonObject &msg);

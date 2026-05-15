@@ -233,26 +233,36 @@ QPushButton#backToListBtn:hover { background: #EAF3DE; border-color: #639922; }<
            <layout class="QHBoxLayout" name="statusRow">
             <item>
              <widget class="QLabel" name="recordingLabel">
-              <property name="text"><string>● 녹화 중</string></property>
-              <property name="visible"><bool>false</bool></property>
+              <property name="minimumSize"><size><width>60</width><height>0</height></size></property>
+              <property name="maximumSize"><size><width>60</width><height>16777215</height></size></property>
+              <property name="styleSheet"><string>font-size:13px; color:#E24B4A; font-weight:500;</string></property>
+              <property name="text"><string/></property>
              </widget>
             </item>
             <item>
              <widget class="QLabel" name="statusLabel">
-              <property name="text"><string>공수 자세를 취하면 자동으로 시작됩니다</string></property>
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                <horstretch>1</horstretch><verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text"><string>녹화 버튼을 눌러 시작하세요</string></property>
+              <property name="alignment"><set>Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set></property>
              </widget>
             </item>
             <item>
-             <spacer>
-              <property name="orientation"><enum>Qt::Horizontal</enum></property>
-              <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
-             </spacer>
+             <widget class="QLabel" name="countdownLabel">
+              <property name="minimumSize"><size><width>24</width><height>0</height></size></property>
+              <property name="maximumSize"><size><width>24</width><height>16777215</height></size></property>
+              <property name="text"><string/></property>
+              <property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property>
+             </widget>
             </item>
             <item>
              <widget class="QPushButton" name="recordBtn">
-              <property name="text"><string>⏺ 녹화</string></property>
+              <property name="text"><string>● 녹화</string></property>
               <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
-              <property name="focusPolicy"><enum>Qt::NoFocus</enum></property>
+              <property name="focusPolicy"><enum>Qt::FocusPolicy::NoFocus</enum></property>
               <property name="styleSheet"><string>QPushButton { background: #3B6D11; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; } QPushButton:hover { background: #27500A; }</string></property>
              </widget>
             </item>

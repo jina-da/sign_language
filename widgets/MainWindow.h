@@ -24,6 +24,8 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+    void stopKeypointServer();   // 외부에서 명시적 종료 가능 (AppController::cleanup 등)
+
     void setUserInfo(const QString &username, bool isDominantLeft);
     void setConnected(bool connected);
     void setTodayProgress(int done, int goal);

@@ -8,6 +8,7 @@
 #include <QJsonObject>
 #include <QImage>
 #include <QKeyEvent>
+#include "VideoPlayer.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class TestWidget; }
@@ -22,6 +23,7 @@ public:
         int     id;
         QString word;
         QString meaning;
+        QString videoCdnUrl;
     };
 
     explicit TestWidget(QWidget *parent = nullptr);
@@ -29,8 +31,11 @@ public:
 
     void setWordList(const QList<WordInfo> &words);
 
+    VideoPlayer *videoPlayer() const { return m_videoPlayer; }
+
     // KeypointClient로부터 연결되는 슬롯
     void onCameraFrame(const QImage &frame);
+    void setCameraConnected(bool connected) { m_cameraConnected = connected; }
     void onKeypointFrame(const QJsonObject &keypoint);
 
     // AppController에서 RES_INFER 수신 시 호출
@@ -59,6 +64,7 @@ private slots:
     void onCountdownTick();
 
 private:
+    VideoPlayer *m_videoPlayer = nullptr;
     void loadWord(int index);
     void startRecording();
     void stopRecording();
@@ -72,7 +78,8 @@ private:
     QList<WordInfo> m_words;
     int    m_currentIndex = 0;
     int    m_correctCount = 0;
-    bool   m_isRecording  = false;
+    bool   m_isRecording     = false;
+    bool   m_cameraConnected = false;
     double m_playSpeed    = 1.0;
 
     QJsonArray    m_keypointBuffer;

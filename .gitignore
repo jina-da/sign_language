@@ -238,6 +238,7 @@ ui_*.h
 qrc_*.cpp
 *.pro.user
 *.pro.user.*
+.qtcreator
 
 # 컴파일 산출물
 *.o

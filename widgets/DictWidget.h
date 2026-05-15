@@ -34,6 +34,7 @@ public:
     { m_serverHost = host; m_sessionToken = token; }
 
     void onCameraFrame(const QImage &frame);
+    void setCameraConnected(bool connected) { m_cameraConnected = connected; }
     void onKeypointFrame(const QJsonObject &keypoint);
 
     void showForwardResult(const QList<DictResult> &results);
@@ -46,6 +47,7 @@ signals:
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private slots:
     void onTabForwardClicked();
@@ -72,7 +74,8 @@ private:
     QTimer        *m_countdownTimer;
     int            m_countdown = 0;
     QElapsedTimer  m_recordingStartTime;
-    bool           m_isRecording = false;
+    bool           m_isRecording     = false;
+    bool           m_cameraConnected = false;
     QJsonArray     m_keypointBuffer;
     QJsonObject    m_prevKeypoint;
     bool           m_hasPrevKeypoint = false;

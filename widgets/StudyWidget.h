@@ -35,6 +35,7 @@ public:
     VideoPlayer* videoPlayer() const { return m_videoPlayer; }   // progress bar 최대값을 daily_goal로 설정
     void onCameraFrame(const QImage &frame);
     void onKeypointFrame(const QJsonObject &keypoint);
+    void setCameraConnected(bool connected) { m_cameraConnected = connected; }
     void showResult(const QString &verdict,
                     double confidence,
                     int predictedWordId);
@@ -57,6 +58,7 @@ private slots:
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private:
     void loadWord(int index);
@@ -73,6 +75,7 @@ private:
     int    m_dailyGoal    = 15;   // 서버에서 받은 목표 단어 수
     int    m_currentIndex = 0;
     bool   m_isRecording  = false;
+    bool   m_cameraConnected = false;   // 카메라(키포인트 서버) 연결 상태
     double m_playSpeed    = 1.0;
 
     QJsonArray    m_keypointBuffer;

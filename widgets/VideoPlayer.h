@@ -43,10 +43,15 @@ public:
 
     // 재생/일시정지 토글
     void togglePlayPause();
+    QMediaPlayer* player() const { return m_player; }
+    void resetToStart();   // 처음으로 되돌리고 일시정지
 
     // 현재 재생 중인 word_id
-    int currentWordId() const { return m_currentWordId; }
+    int  currentWordId() const { return m_currentWordId; }
     void setCurrentWordId(int id) { m_currentWordId = id; }
+
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
 signals:
     void playbackStarted();
