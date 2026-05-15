@@ -84,6 +84,20 @@ ai_server/
 | v6 | pose 관절 순서 OpenPose→MediaPipe 매핑 | 93.18% |
 | **v7** | 차분(delta) 추가 — 동작 변화량 학습 | **93.69%** |
 
+
+
+### 시각화
+
+![Version Accuracy](portfolio_images/01_version_accuracy.png)
+
+![Training Curve](portfolio_images/02_training_curve.png)
+
+![Joint Order Mismatch](portfolio_images/03_joint_order_mismatch.png)
+
+![False Positive Analysis](portfolio_images/04_fp_analysis.png)
+
+
+
 ### 데이터 증강 방법
 
 원본 15,837개 → 증강 후 63,345개 (×5배)
