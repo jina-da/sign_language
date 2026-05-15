@@ -1,0 +1,22 @@
+# ─────────────────────────────────────────────
+# SignLearn 운용 서버 의존성
+# Python 3.11+ 필요
+# 설치: pip install -r requirements.txt
+# ─────────────────────────────────────────────
+
+# ── DB 연결 (비동기 MariaDB/MySQL) ──────────────
+aiomysql==0.2.0
+
+# ── Python 버전별 호환 ──────────────────────────
+# asyncio, json, struct, uuid, signal, logging, pathlib
+# 위 모두 표준 라이브러리 — 별도 설치 불필요
+
+# ─────────────────────────────────────────────
+# [이지나] AI 서버용 추가 의존성 (ai_server.py)
+# ─────────────────────────────────────────────
+# torch==2.3.0          # PyTorch (CUDA 버전은 아래 주석 참고)
+# numpy==1.26.4
+#
+# CUDA 포함 PyTorch 설치 (Ubuntu 22.04 + CUDA 12.1):
+#   pip install torch==2.3.0 --index-url https://download.pytorch.org/whl/cu121
+# ─────────────────────────────────────────────
