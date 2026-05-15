@@ -167,6 +167,8 @@ AI서버 → 운용서버
 
 ## 🔄 자동 재학습 파이프라인
 
+![자동 재학습 파이프라인](ai_server/portfolio_images/4_자동재학습.png)
+
 ```
 keypoint_store (DB)
   ↓ is_trained=0 데이터 로드
