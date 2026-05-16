@@ -11,8 +11,7 @@
 #include "VideoPlayer.h"
 
 // ReviewWidget은 StudyWidget과 동일한 .ui 파일을 공유한다.
-// uic가 생성하는 클래스명이 Ui::StudyWidget 이므로
-// namespace를 StudyWidget으로 선언한다.
+// uic가 생성하는 클래스명이 Ui::StudyWidget 이므로 namespace를 StudyWidget으로 선언한다.
 QT_BEGIN_NAMESPACE
 namespace Ui { class StudyWidget; }
 QT_END_NAMESPACE

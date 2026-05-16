@@ -29,7 +29,7 @@ public:
         QString videoCdnUrl;
     };
 
-    // 로그인 후 세션 정보 세팅 — 이후 생성되는 VideoPlayer에 적용됨
+    // 로그인 후 세션 정보 세팅 -> 이후 생성되는 VideoPlayer에 적용됨
     void setSession(const QString &host, const QString &token)
     { m_serverHost = host; m_sessionToken = token; }
 

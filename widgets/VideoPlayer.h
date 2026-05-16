@@ -13,17 +13,6 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
-/**
- * VideoPlayer — 스트리밍 + 로컬 캐싱 영상 재생 위젯
- *
- * 동작 방식:
- *   - 로컬 캐시(videos/) 있음 → 즉시 로컬 재생
- *   - 없음 → 스트리밍 재생 + 백그라운드 다운로드 동시 진행
- *   - 다음 재생부터 로컬 캐시 사용
- *
- * 서버: FastAPI :8000
- * URL: http://{host}:8000/video/{filename}?session_token={token}
- */
 class VideoPlayer : public QWidget
 {
     Q_OBJECT

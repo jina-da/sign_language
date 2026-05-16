@@ -5,6 +5,8 @@
 #include <QMenu>
 #include <QPushButton>
 #include <QProcess>
+#include <QScrollArea>
+#include <QLabel>
 #include "StudyWidget.h"
 #include "ReviewWidget.h"
 #include "DictWidget.h"
@@ -29,8 +31,15 @@ public:
     void setUserInfo(const QString &username, bool isDominantLeft);
     void setConnected(bool connected);
     void setTodayProgress(int done, int goal);
-    void setDailyGoal(int goal);   // 목표 단어 수만 갱신 (done 보존)
-    void setReviewCount(int count);
+    void setDailyGoal(int goal);       // 목표 단어 수만 갱신 (done 보존)
+    void setReviewCount(int count);    // 미구현 (서버 대기)
+
+    // 홈 화면 카드 뱃지 갱신 (RES_LOGIN에서 호출)
+    void setHomeBadges(int reviewPendingCount, int highScore);
+
+    // 홈 하단 "오늘 학습한 단어" 목록 갱신 (RES_DAILY_WORDS에서 호출)
+    struct LearnedWord { int wordId; QString word; QString meaning; };
+    void setLearnedWords(const QList<LearnedWord> &words);
 
     StudyWidget*    studyWidget()    const { return m_studyWidget; }
     ReviewWidget*   reviewWidget()   const { return m_reviewWidget; }
@@ -48,6 +57,7 @@ public:
 signals:
     void logoutRequested();
     void settingsRequested();
+    void homeRequested();        // 홈 탭 진입 시 REQ_DAILY_WORDS 재전송 트리거
     void studyModeRequested();
     void reviewModeRequested();
     void gameModeRequested();
@@ -70,6 +80,9 @@ private:
     QString m_username;
     int m_todayDone = 0;
     int m_todayGoal = 15;
+
+    QScrollArea *m_wordScrollArea = nullptr;  // wordCard 내 스크롤 영역
+    QWidget     *m_wordListWidget = nullptr;  // 단어 행들의 컨테이너
 
     QProcess *m_keypointProcess = nullptr;
     bool      m_kpServerReady   = false;

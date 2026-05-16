@@ -1,15 +1,9 @@
 #pragma once
 #include <QString>
 
-/**
- * AppStyle — 앱 전체에서 쓰는 색상·스타일 상수 모음
- *
- * 디자인을 수정하고 싶으면 이 파일의 값만 바꾸면
- * 모든 위젯에 자동으로 반영됩니다.
- */
 namespace AppStyle
 {
-    // ── 색상 ─────────────────────────────────────────
+    // 색상
     constexpr auto C_GREEN_DARK   = "#3B6D11";   // 버튼·헤더·강조
     constexpr auto C_GREEN_MID    = "#639922";   // 서브 텍스트·아이콘
     constexpr auto C_GREEN_LIGHT  = "#97C459";   // 연한 강조
@@ -28,11 +22,11 @@ namespace AppStyle
     constexpr auto C_BLUE_BG      = "#E6F1FB";   // 사전 배지 배경
     constexpr auto C_BLUE_TEXT    = "#0C447C";   // 사전 배지 텍스트
 
-    // ── 앱 이름 (나중에 한 곳만 수정) ───────────────
+    // 앱 이름 (나중에 수정)
     constexpr auto APP_NAME       = "수화배움";
     constexpr auto APP_SUBTITLE   = "한국 수화 학습 시스템";
 
-    // ── 공통 QSS 조각 ────────────────────────────────
+    // 공통 QSS 조각
 
     // 초록 주요 버튼
     inline QString btnPrimary() {

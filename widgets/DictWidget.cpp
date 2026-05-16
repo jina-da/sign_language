@@ -19,7 +19,7 @@ DictWidget::DictWidget(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // ── 정지 감지 타이머 (역방향, StudyWidget과 동일) ─
+    // 정지 감지 타이머 (역방향, StudyWidget과 동일)
     m_stopTimer->setSingleShot(true);
     m_stopTimer->setInterval(1500);
     connect(m_stopTimer, &QTimer::timeout,
@@ -34,7 +34,7 @@ DictWidget::DictWidget(QWidget *parent)
     connect(m_countdownTimer, &QTimer::timeout,
             this,             &DictWidget::onCountdownTick);
 
-    // ── 탭 버튼 ──────────────────────────────────────
+    // 탭 버튼
     // 초기 상태: noResultPage(0번) 표시
     ui->forwardContentStack->setCurrentIndex(0);
 
@@ -48,7 +48,7 @@ DictWidget::DictWidget(QWidget *parent)
     connect(ui->tabReverseBtn, &QPushButton::clicked,
             this,              &DictWidget::onTabReverseClicked);
 
-    // ── 정방향 검색 ───────────────────────────────────
+    // 정방향 검색
     connect(ui->searchBtn,  &QPushButton::clicked,
             this,           &DictWidget::onSearchBtnClicked);
     connect(ui->searchEdit, &QLineEdit::returnPressed,
@@ -63,9 +63,7 @@ DictWidget::~DictWidget()
     delete ui;
 }
 
-// ─────────────────────────────────────────────────────────────
-// switchTab — 탭 전환 및 버튼 스타일 갱신
-// ─────────────────────────────────────────────────────────────
+// 탭 전환 및 버튼 스타일 갱신
 void DictWidget::switchTab(int index)
 {
     m_currentTab = index;
@@ -121,9 +119,7 @@ void DictWidget::onDebounceTimeout()
     qDebug() << "[Dict] 정방향 검색:" << query;
 }
 
-// ─────────────────────────────────────────────────────────────
-// showForwardResult — RES_DICT_SEARCH 수신 후 호출
-// ─────────────────────────────────────────────────────────────
+// RES_DICT_SEARCH 수신 후 호출
 void DictWidget::showForwardResult(const QList<DictResult> &results)
 {
     clearResults();
@@ -138,9 +134,7 @@ void DictWidget::showForwardResult(const QList<DictResult> &results)
     showListPage();
 }
 
-// ─────────────────────────────────────────────────────────────
-// showListPage — 1페이지: 단어+뜻 목록 카드 (클릭 시 상세로)
-// ─────────────────────────────────────────────────────────────
+// 1페이지: 단어+뜻 목록 카드 (클릭 시 상세로)
 void DictWidget::showListPage()
 {
     QLayout *listLayout = ui->listScrollContent->layout();
@@ -184,8 +178,7 @@ void DictWidget::showListPage()
         innerLayout->addWidget(descLbl, 1);
         innerLayout->addWidget(arrow);
 
-        // 클릭 감지: QWidget은 clicked 시그널이 없으므로 이벤트 필터 대신
-        // 투명 QPushButton을 위에 올림
+        // 클릭 감지: QWidget은 clicked 시그널이 없으므로 이벤트 필터 대신 투명 QPushButton을 위에 올림
         QPushButton *clickOverlay = new QPushButton(card);
         clickOverlay->setGeometry(0, 0, 9999, 80);
         clickOverlay->setStyleSheet("background:transparent; border:none;");
@@ -206,9 +199,7 @@ void DictWidget::showListPage()
     qDebug() << "[Dict] 목록 페이지:" << m_currentResults.size() << "개";
 }
 
-// ─────────────────────────────────────────────────────────────
-// showDetailPage — 2페이지: 단어+뜻+영상
-// ─────────────────────────────────────────────────────────────
+// 2페이지: 단어+뜻+영상
 void DictWidget::showDetailPage(const DictResult &result)
 {
     for (VideoPlayer *vp : m_resultPlayers) vp->deleteLater();
@@ -263,7 +254,6 @@ void DictWidget::showDetailPage(const DictResult &result)
     qDebug() << "[Dict] 상세 페이지:" << result.word;
 }
 
-
 void DictWidget::onBackToListClicked()
 {
     // 2페이지 → 1페이지로 복귀
@@ -310,9 +300,7 @@ void DictWidget::clearResults()
     ui->forwardContentStack->setCurrentIndex(0);
 }
 
-// ─────────────────────────────────────────────────────────────
-// showReverseResult — RES_DICT_REVERSE 수신 후 호출
-// ─────────────────────────────────────────────────────────────
+// RES_DICT_REVERSE 수신 후 호출
 void DictWidget::showReverseResult(const QString &word,
                                    const QString &description)
 {
@@ -323,9 +311,6 @@ void DictWidget::showReverseResult(const QString &word,
     qDebug() << "[Dict] 역방향 결과:" << word;
 }
 
-// ─────────────────────────────────────────────────────────────
-// showSearchError
-// ─────────────────────────────────────────────────────────────
 void DictWidget::showSearchError(const QString &message)
 {
     if (m_currentTab == 0) {
@@ -338,9 +323,6 @@ void DictWidget::showSearchError(const QString &message)
     qWarning() << "[Dict] 검색 오류:" << message;
 }
 
-// ─────────────────────────────────────────────────────────────
-// onCameraFrame
-// ─────────────────────────────────────────────────────────────
 void DictWidget::onCameraFrame(const QImage &frame)
 {
     // 역방향 탭에서만 카메라 표시
@@ -352,9 +334,8 @@ void DictWidget::onCameraFrame(const QImage &frame)
             Qt::SmoothTransformation));
 }
 
-// ─────────────────────────────────────────────────────────────
-// onKeypointFrame — 역방향 탭에서만 처리
-// ─────────────────────────────────────────────────────────────
+
+// 역방향 탭에서만 처리
 void DictWidget::onKeypointFrame(const QJsonObject &keypoint)
 {
     if (!m_isRecording) return;
@@ -386,9 +367,6 @@ void DictWidget::onKeypointFrame(const QJsonObject &keypoint)
         m_stopTimer->start();
 }
 
-// ─────────────────────────────────────────────────────────────
-// startRecording
-// ─────────────────────────────────────────────────────────────
 void DictWidget::startRecording()
 {
     if (m_isRecording) return;
@@ -400,15 +378,12 @@ void DictWidget::startRecording()
     ui->recordingLabel->setStyleSheet("font-size:13px; color:#E24B4A; font-weight:500;");
     ui->recordingLabel->setText("● 녹화 중");
     ui->statusLabel->setText("녹화 중... 수화를 입력하세요. 움직임이 멈추면 자동 종료됩니다.");
-        ui->recordBtn->setStyleSheet("QPushButton { background: #E24B4A; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
+    ui->recordBtn->setStyleSheet("QPushButton { background: #E24B4A; color: white; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; padding: 8px 24px; min-width: 100px; }");
     ui->reverseResultCard->hide();
     m_stopTimer->start();
     qDebug() << "[Dict] 역방향 녹화 시작";
 }
 
-// ─────────────────────────────────────────────────────────────
-// stopRecording
-// ─────────────────────────────────────────────────────────────
 void DictWidget::stopRecording()
 {
     if (!m_isRecording) return;
@@ -429,7 +404,6 @@ void DictWidget::stopRecording()
     ui->statusLabel->setText("인식 중...");
     emit reverseSearchRequested(m_keypointBuffer);
 }
-
 
 void DictWidget::hideEvent(QHideEvent *event)
 {

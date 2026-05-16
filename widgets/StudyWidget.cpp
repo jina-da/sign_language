@@ -18,7 +18,7 @@ StudyWidget::StudyWidget(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // ── videoPlayer QLabel → VideoPlayer 위젯으로 교체 ──
+    // videoPlayer QLabel → VideoPlayer 위젯으로 교체
     m_videoPlayer = new VideoPlayer(this);
     m_videoPlayer->setMinimumSize(ui->videoPlayer->minimumSize());
 
@@ -108,10 +108,8 @@ StudyWidget::~StudyWidget()
     delete ui;
 }
 
-// ─────────────────────────────────────────────────────────────
 // setDailyGoal — progress bar 최대값을 daily_goal로 설정
 // AppController에서 RES_LOGIN/RES_DAILY_WORDS 수신 후 호출
-// ─────────────────────────────────────────────────────────────
 void StudyWidget::setDailyGoal(int goal)
 {
     m_dailyGoal = goal;
@@ -119,9 +117,6 @@ void StudyWidget::setDailyGoal(int goal)
     qDebug() << "[Study] daily_goal 설정:" << goal;
 }
 
-// ─────────────────────────────────────────────────────────────
-// setWordList
-// ─────────────────────────────────────────────────────────────
 void StudyWidget::setWordList(const QList<WordInfo> &words)
 {
     m_words        = words;
@@ -132,9 +127,6 @@ void StudyWidget::setWordList(const QList<WordInfo> &words)
     loadWord(0);
 }
 
-// ─────────────────────────────────────────────────────────────
-// loadWord
-// ─────────────────────────────────────────────────────────────
 void StudyWidget::loadWord(int index)
 {
     if (m_words.isEmpty() || index >= m_words.size()) {
@@ -156,7 +148,6 @@ void StudyWidget::loadWord(int index)
 
     bool isLastWord = (index == m_words.size() - 1);
     if (isLastWord) {
-        // 마지막 단어: 녹화 없이도 테스트로 넘어갈 수 있도록 버튼 활성화
         ui->nextBtn->setEnabled(true);
         ui->nextBtn->setText("테스트 시작 →");
     } else {
@@ -183,21 +174,17 @@ void StudyWidget::loadWord(int index)
     ui->statusLabel->setText(
         "녹화 버튼을 눌러 시작하세요");
 
-    // 영상 자동 재생
+    // 영상 로드
     if (!w.videoCdnUrl.isEmpty()) {
         QString filename = w.videoCdnUrl.split("/").last().split("?").first();
         m_videoPlayer->setCurrentWordId(w.id);
         m_videoPlayer->play(w.videoCdnUrl, filename);
-        } else {
         }
 
     qDebug() << "[Study] 단어 로드:" << w.word
              << "(" << index+1 << "/" << m_words.size() << ")";
 }
 
-// ─────────────────────────────────────────────────────────────
-// onCameraFrame — 카메라 프레임 표시
-// ─────────────────────────────────────────────────────────────
 void StudyWidget::onCameraFrame(const QImage &frame)
 {
     ui->cameraView->setPixmap(
@@ -207,9 +194,6 @@ void StudyWidget::onCameraFrame(const QImage &frame)
             Qt::SmoothTransformation));
 }
 
-// ─────────────────────────────────────────────────────────────
-// onKeypointFrame
-// ─────────────────────────────────────────────────────────────
 void StudyWidget::onKeypointFrame(const QJsonObject &keypoint)
 {
     // 버튼 방식으로 전환 — 녹화 중일 때만 처리
@@ -217,10 +201,6 @@ void StudyWidget::onKeypointFrame(const QJsonObject &keypoint)
 
     m_keypointBuffer.append(keypoint);
 
-    // ── 움직임 감지: 이전 프레임과의 좌표 변화량으로 판단 ────
-    // 기준: 왼손 또는 오른손 손목(index 0) x,y 변화량 합계
-    // MOTION_THRESHOLD 이상이면 "움직임 있음" → 타이머 리셋
-    // 미만이면 "정지" → 타이머가 만료되면 자동 종료
     static constexpr double MOTION_THRESHOLD = 19.2; // 픽셀 기준 (1920x1080 해상도, 약 1%)
 
     auto wrist = [](const QJsonObject &kp, const QString &side) -> QPointF {
@@ -265,10 +245,6 @@ void StudyWidget::onKeypointFrame(const QJsonObject &keypoint)
     }
 }
 
-
-// ─────────────────────────────────────────────────────────────
-// startRecording
-// ─────────────────────────────────────────────────────────────
 void StudyWidget::startRecording()
 {
     if (m_isRecording) return;
@@ -290,9 +266,6 @@ void StudyWidget::startRecording()
     qDebug() << "[Study] 녹화 시작";
 }
 
-// ─────────────────────────────────────────────────────────────
-// stopRecording
-// ─────────────────────────────────────────────────────────────
 void StudyWidget::stopRecording()
 {
     if (!m_isRecording) return;
@@ -321,18 +294,11 @@ void StudyWidget::stopRecording()
     emit keypointReady(w.id, false, m_keypointBuffer);
 }
 
-
-// ─────────────────────────────────────────────────────────────
-// onRecordingTimeout
-// ─────────────────────────────────────────────────────────────
 void StudyWidget::onRecordingTimeout()
 {
     stopRecording();
 }
 
-// ─────────────────────────────────────────────────────────────
-// showResult
-// ─────────────────────────────────────────────────────────────
 void StudyWidget::showResult(const QString &verdict,
                               double confidence,
                               int predictedWordId)
@@ -354,9 +320,6 @@ void StudyWidget::showResult(const QString &verdict,
         ui->statusLabel->setText("다시 시도해 보세요.");
 }
 
-// ─────────────────────────────────────────────────────────────
-// applyVerdictStyle
-// ─────────────────────────────────────────────────────────────
 void StudyWidget::applyVerdictStyle(const QString &verdict)
 {
     if (verdict == "correct") {
@@ -380,24 +343,17 @@ void StudyWidget::applyVerdictStyle(const QString &verdict)
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// updateProgress  ★ 버그 수정: m_currentIndex+1 로 변경
-// ─────────────────────────────────────────────────────────────
 void StudyWidget::updateProgress()
 {
     int total   = m_words.size();
     int current = m_currentIndex + 1;
 
-    // ★ 수정 전: setValue(m_currentIndex)  → 마지막 단어에서 90%만 참
-    // ★ 수정 후: setValue(m_currentIndex + 1) → 정확히 현재 단어 번호만큼 참
     ui->studyProgress->setValue(current);
     ui->wordIndexLabel->setText(
         QString("%1 / %2").arg(current).arg(total));
 }
 
-// ─────────────────────────────────────────────────────────────
-// onPrevClicked  ★ 신규: 이전 단어로 이동
-// ─────────────────────────────────────────────────────────────
+// 이전 단어로 이동
 void StudyWidget::onPrevClicked()
 {
     if (m_currentIndex <= 0) return;
@@ -405,9 +361,7 @@ void StudyWidget::onPrevClicked()
     loadWord(m_currentIndex);
 }
 
-// ─────────────────────────────────────────────────────────────
-// onNextClicked  ★ 수정: 마지막 단어 후 완료 팝업
-// ─────────────────────────────────────────────────────────────
+// 마지막 단어 후 완료 알림
 void StudyWidget::onNextClicked()
 {
     // 마지막 단어 완료 후 "테스트 시작 →" 버튼을 누른 경우
@@ -426,9 +380,7 @@ void StudyWidget::onNextClicked()
     loadWord(m_currentIndex);
 }
 
-// ─────────────────────────────────────────────────────────────
-// showCompletionDialog  ★ 신규: 모든 단어 완료 시 팝업
-// ─────────────────────────────────────────────────────────────
+// 모든 단어 완료 시 알림
 void StudyWidget::showCompletionDialog()
 {
     // 진도 바 100% 로 채우기
@@ -443,9 +395,6 @@ void StudyWidget::showCompletionDialog()
     qDebug() << "[Study] 학습 완료 → 테스트 시작 버튼 활성화";
 }
 
-// ─────────────────────────────────────────────────────────────
-// onSkipClicked
-// ─────────────────────────────────────────────────────────────
 void StudyWidget::onSkipClicked()
 {
     if (m_words.isEmpty() || m_currentIndex >= m_words.size())
@@ -454,8 +403,6 @@ void StudyWidget::onSkipClicked()
     emit wordSkipped(m_words[m_currentIndex].id);
     m_currentIndex++;
 
-    // 마지막 단어를 건너뛴 경우 → loadWord 내부에서 studyFinished emit 후 리턴되므로,
-    // 완료 팝업은 onNextClicked 와 동일한 흐름인 showCompletionDialog()로 공통 처리
     if (m_currentIndex >= m_words.size()) {
         showCompletionDialog();
         return;
@@ -546,7 +493,7 @@ void StudyWidget::onRecordBtnClicked()
         return;
     }
 
-    // 카운트다운 시작 — recordingLabel에 큰 글씨로 숫자 표시
+    // 카운트다운 시작
     m_countdown = 3;
     ui->countdownLabel->setText("");
     ui->recordingLabel->setText(QString::number(m_countdown));

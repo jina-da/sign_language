@@ -38,7 +38,7 @@ TestWidget::TestWidget(QWidget *parent)
     // resultCard 초기 숨김
     ui->resultCard->setVisible(false);
 
-    // ── VideoPlayer 위젯 교체 ──────────────────────────────
+    // VideoPlayer 위젯 교체
     m_videoPlayer = new VideoPlayer(this);
     m_videoPlayer->setFixedHeight(240);
     QLayout *videoLayout = ui->videoPlayer->parentWidget()->layout();
@@ -88,9 +88,6 @@ TestWidget::~TestWidget()
     delete ui;
 }
 
-// ─────────────────────────────────────────────────────────────
-// setWordList
-// ─────────────────────────────────────────────────────────────
 void TestWidget::setWordList(const QList<WordInfo> &words)
 {
     m_words        = words;
@@ -102,9 +99,6 @@ void TestWidget::setWordList(const QList<WordInfo> &words)
     loadWord(0);
 }
 
-// ─────────────────────────────────────────────────────────────
-// loadWord
-// ─────────────────────────────────────────────────────────────
 void TestWidget::loadWord(int index)
 {
     if (m_words.isEmpty() || index >= m_words.size()) {
@@ -150,9 +144,6 @@ void TestWidget::loadWord(int index)
              << "(" << index+1 << "/" << m_words.size() << ")";
 }
 
-// ─────────────────────────────────────────────────────────────
-// onCameraFrame
-// ─────────────────────────────────────────────────────────────
 void TestWidget::onCameraFrame(const QImage &frame)
 {
     ui->cameraView->setPixmap(
@@ -162,9 +153,6 @@ void TestWidget::onCameraFrame(const QImage &frame)
             Qt::SmoothTransformation));
 }
 
-// ─────────────────────────────────────────────────────────────
-// onKeypointFrame
-// ─────────────────────────────────────────────────────────────
 void TestWidget::onKeypointFrame(const QJsonObject &keypoint)
 {
     if (!m_isRecording) return;
@@ -196,9 +184,6 @@ void TestWidget::onKeypointFrame(const QJsonObject &keypoint)
         m_stopTimer->start();
 }
 
-// ─────────────────────────────────────────────────────────────
-// startRecording
-// ─────────────────────────────────────────────────────────────
 void TestWidget::startRecording()
 {
     if (m_isRecording) return;
@@ -214,9 +199,6 @@ void TestWidget::startRecording()
     qDebug() << "[Test] 녹화 시작";
 }
 
-// ─────────────────────────────────────────────────────────────
-// stopRecording
-// ─────────────────────────────────────────────────────────────
 void TestWidget::stopRecording()
 {
     if (!m_isRecording) return;
@@ -294,9 +276,7 @@ void TestWidget::onRecordingTimeout()
     stopRecording();
 }
 
-// ─────────────────────────────────────────────────────────────
-// showResult — AppController에서 RES_INFER 수신 시 호출
-// ─────────────────────────────────────────────────────────────
+// AppController에서 RES_INFER 수신 시 호출
 void TestWidget::showResult(bool isCorrect, double accuracy, int wordId)
 {
     Q_UNUSED(wordId)
@@ -331,15 +311,13 @@ void TestWidget::showResult(bool isCorrect, double accuracy, int wordId)
     ui->nextBtn->setText(isLast ? "결과 보기" : "다음 →");
     ui->nextBtn->setEnabled(true);
 
-    // ★ 정답/오답 무관하게 영상 자동재생
     triggerVideoPlay();
 
     qDebug() << "[Test] 결과:" << (isCorrect ? "정답" : "오답")
              << "신뢰도:" << accuracy * 100.0 << "%";
 }
 
-// ─────────────────────────────────────────────────────────────
-// triggerVideoPlay — 정답/오답 시 영상 재생
+// 정답/오답 시 영상 재생
 void TestWidget::triggerVideoPlay()
 {
     if (m_words.isEmpty() || m_currentIndex >= m_words.size()) return;
@@ -351,18 +329,13 @@ void TestWidget::triggerVideoPlay()
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// onReplayClicked — 영상 다시 보기
-// ─────────────────────────────────────────────────────────────
+// 영상 다시 보기
 void TestWidget::onReplayClicked()
 {
     triggerVideoPlay();
     qDebug() << "[Test] 영상 다시 보기";
 }
 
-// ─────────────────────────────────────────────────────────────
-// onSpeedChanged
-// ─────────────────────────────────────────────────────────────
 void TestWidget::onSpeedChanged()
 {
     QMap<QPushButton*, double> speedMap = {
@@ -379,9 +352,6 @@ void TestWidget::onSpeedChanged()
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// onNextClicked
-// ─────────────────────────────────────────────────────────────
 void TestWidget::onNextClicked()
 {
     m_currentIndex++;
@@ -392,17 +362,11 @@ void TestWidget::onNextClicked()
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// onHomeClicked
-// ─────────────────────────────────────────────────────────────
 void TestWidget::onHomeClicked()
 {
     emit testAborted();
 }
 
-// ─────────────────────────────────────────────────────────────
-// showSummary
-// ─────────────────────────────────────────────────────────────
 void TestWidget::showSummary()
 {
     int total = m_words.size();
@@ -430,9 +394,6 @@ void TestWidget::showSummary()
     qDebug() << "[Test] 완료 -" << m_correctCount << "/" << total;
 }
 
-// ─────────────────────────────────────────────────────────────
-// updateProgress
-// ─────────────────────────────────────────────────────────────
 void TestWidget::updateProgress()
 {
     int total   = m_words.size();

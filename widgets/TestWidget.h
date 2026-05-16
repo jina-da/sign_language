@@ -47,8 +47,7 @@ signals:
     void testFinished(int correctCount, int totalCount);
     void testAborted();
 
-    // 영상 재생 요청 (VideoPlayer 연동 예정)
-    // wordId에 해당하는 영상을 speed 배속으로 재생
+    // 영상 재생 요청. wordId에 해당하는 영상을 speed 배속으로 재생
     void videoPlayRequested(int wordId, double speed);
 
 protected:

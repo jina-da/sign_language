@@ -15,6 +15,7 @@
  *
  * 패킷 구조: [4byte big-endian 길이] + [data]
  */
+
 class KeypointClient : public QObject
 {
     Q_OBJECT

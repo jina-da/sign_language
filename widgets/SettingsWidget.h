@@ -7,20 +7,6 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class SettingsWidget; }
 QT_END_NAMESPACE
 
-/**
- * SettingsWidget — 개인 설정 화면
- *
- * 저장 방식: 각 항목을 수정한 뒤 "저장" 버튼을 누르면
- * 변경된 항목만 골라서 서버에 전송한다.
- *
- * 전송 메시지 목록:
- *   REQ_SET_DAILY_GOAL   (801) — 하루 목표 단어 수
- *   REQ_SET_DOMINANT_HAND(803) — 우세손
- *   REQ_SET_DEAF         (805) — 농인 여부
- *   REQ_CHANGE_PASSWORD  (807) — 비밀번호 변경
- *   REQ_SET_CONSENT      (809) — 키포인트 수집 동의
- *   REQ_WITHDRAW         (811) — 회원 탈퇴
- */
 class SettingsWidget : public QWidget
 {
     Q_OBJECT

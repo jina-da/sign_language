@@ -33,9 +33,7 @@ SettingsWidget::~SettingsWidget()
     delete ui;
 }
 
-// ─────────────────────────────────────────────────────────────
-// setInitialValues — 로그인 후 서버 값으로 화면 초기화
-// ─────────────────────────────────────────────────────────────
+// 로그인 후 서버 값으로 화면 초기화
 void SettingsWidget::setInitialValues(int dailyGoal,
                                       bool isDominantLeft,
                                       bool isDeaf,
@@ -67,9 +65,7 @@ void SettingsWidget::setInitialValues(int dailyGoal,
              << "consent=" << keypointConsent;
 }
 
-// ─────────────────────────────────────────────────────────────
-// onSaveClicked — 변경된 항목만 골라서 시그널 emit
-// ─────────────────────────────────────────────────────────────
+// 변경된 항목만 골라서 시그널 emit
 void SettingsWidget::onSaveClicked()
 {
     ui->pwErrorLabel->hide();
@@ -84,7 +80,7 @@ void SettingsWidget::onSaveClicked()
     QString newPw  = ui->newPwEdit->text();
     QString confPw = ui->confirmPwEdit->text();
 
-    // ── 비밀번호 변경 유효성 검사 ─────────────────────
+    // 비밀번호 변경 유효성 검사
     bool wantsPasswordChange = !curPw.isEmpty() || !newPw.isEmpty();
     if (wantsPasswordChange) {
         if (curPw.isEmpty()) {
@@ -104,7 +100,7 @@ void SettingsWidget::onSaveClicked()
         }
     }
 
-    // ── 변경된 항목만 시그널 emit ─────────────────────
+    // 변경된 항목만 시그널 emit
     if (newGoal != m_origGoal) {
         m_pendingCount++;
         emit dailyGoalChangeRequested(newGoal);
@@ -135,9 +131,7 @@ void SettingsWidget::onSaveClicked()
     qDebug() << "[Settings] 저장 요청 항목 수:" << m_pendingCount;
 }
 
-// ─────────────────────────────────────────────────────────────
 // onWithdrawClicked — 회원 탈퇴 확인 다이얼로그
-// ─────────────────────────────────────────────────────────────
 void SettingsWidget::onWithdrawClicked()
 {
     QMessageBox confirm(this);
@@ -166,10 +160,8 @@ void SettingsWidget::onWithdrawClicked()
     qDebug() << "[Settings] 회원 탈퇴 요청";
 }
 
-// ─────────────────────────────────────────────────────────────
+
 // onSaveSuccess — 서버 응답 성공 처리
-// settingType: "goal" | "hand" | "deaf" | "password" | "consent"
-// ─────────────────────────────────────────────────────────────
 void SettingsWidget::onSaveSuccess(const QString &settingType)
 {
     // 원래값 업데이트
@@ -195,9 +187,7 @@ void SettingsWidget::onSaveSuccess(const QString &settingType)
     }
 }
 
-// ─────────────────────────────────────────────────────────────
 // onSaveError — 서버 오류 처리
-// ─────────────────────────────────────────────────────────────
 void SettingsWidget::onSaveError(const QString &message)
 {
     m_pendingCount = 0;
@@ -206,9 +196,7 @@ void SettingsWidget::onSaveError(const QString &message)
     qWarning() << "[Settings] 저장 오류:" << message;
 }
 
-// ─────────────────────────────────────────────────────────────
 // onWithdrawSuccess — 탈퇴 완료 (AppController가 로그아웃 처리)
-// ─────────────────────────────────────────────────────────────
 void SettingsWidget::updateDailyGoal(int goal)
 {
     // 서버에서 받은 실제 goal로 SpinBox와 원래값 모두 갱신
@@ -223,9 +211,7 @@ void SettingsWidget::onWithdrawSuccess()
     qDebug() << "[Settings] 회원 탈퇴 완료";
 }
 
-// ─────────────────────────────────────────────────────────────
 // 내부 헬퍼
-// ─────────────────────────────────────────────────────────────
 QString SettingsWidget::hashPassword(const QString &plain) const
 {
     return QCryptographicHash::hash(

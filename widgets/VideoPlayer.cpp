@@ -19,7 +19,7 @@ VideoPlayer::VideoPlayer(QWidget *parent)
     , m_progressSlider(new QSlider(Qt::Horizontal, this))
     , m_timeLabel(new QLabel("0:00 / 0:00", this))
 {
-    // ── 레이아웃 ──────────────────────────────────────
+    // 레이아웃
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
@@ -85,7 +85,7 @@ VideoPlayer::VideoPlayer(QWidget *parent)
     root->addWidget(controlBar);
     setLayout(root);
 
-    // ── QMediaPlayer 설정 ────────────────────────────
+    // QMediaPlayer 설정
     m_player->setVideoOutput(m_videoWidget);
 
     // 영상 부분 클릭 → 재생/일시정지
@@ -100,7 +100,7 @@ VideoPlayer::VideoPlayer(QWidget *parent)
     connect(m_player, &QMediaPlayer::positionChanged,
             this,     &VideoPlayer::onPositionChanged);
 
-    // ── 컨트롤 연결 ──────────────────────────────────
+    // 컨트롤 연결
     connect(m_playBtn, &QPushButton::clicked,
             this,      &VideoPlayer::togglePlayPause);
     connect(m_progressSlider, &QSlider::sliderMoved,
@@ -111,7 +111,7 @@ VideoPlayer::VideoPlayer(QWidget *parent)
         qDebug() << "[Video] 반복 재생:" << (checked ? "ON" : "OFF");
     });
 
-    // ── 다운로드 완료 ─────────────────────────────────
+    // 다운로드 완료
     connect(m_networkManager, &QNetworkAccessManager::finished,
             this,             &VideoPlayer::onDownloadFinished);
 
@@ -127,9 +127,6 @@ VideoPlayer::~VideoPlayer()
     m_player->stop();
 }
 
-// ─────────────────────────────────────────────────────────────
-// setSession
-// ─────────────────────────────────────────────────────────────
 void VideoPlayer::setSession(const QString &serverHost,
                               const QString &sessionToken)
 {
@@ -138,10 +135,6 @@ void VideoPlayer::setSession(const QString &serverHost,
     qDebug() << "[Video] 세션 세팅: host=" << serverHost;
 }
 
-// ─────────────────────────────────────────────────────────────
-// play — 소스 세팅만 하고 재생은 하지 않음 (수동 재생)
-// 버퍼가 준비되면 컨트롤 활성화
-// ─────────────────────────────────────────────────────────────
 void VideoPlayer::play(const QString &videoCdnUrl, const QString &filename)
 {
     if (videoCdnUrl.isEmpty() || filename.isEmpty()) {
@@ -170,9 +163,6 @@ void VideoPlayer::play(const QString &videoCdnUrl, const QString &filename)
     // 실제 재생은 사용자가 ▶ 버튼을 누를 때 시작
 }
 
-// ─────────────────────────────────────────────────────────────
-// setSpeed
-// ─────────────────────────────────────────────────────────────
 void VideoPlayer::setSpeed(double speed)
 {
     m_speed = speed;
@@ -180,9 +170,6 @@ void VideoPlayer::setSpeed(double speed)
     qDebug() << "[Video] 재생 속도:" << speed;
 }
 
-// ─────────────────────────────────────────────────────────────
-// togglePlayPause
-// ─────────────────────────────────────────────────────────────
 bool VideoPlayer::eventFilter(QObject *obj, QEvent *event)
 {
     if (obj == m_videoWidget && event->type() == QEvent::MouseButtonPress) {
@@ -210,10 +197,7 @@ void VideoPlayer::togglePlayPause()
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// onMediaStatusChanged
-// 버퍼 준비 완료 → 재생 버튼 활성화 (자동 재생 없음)
-// ─────────────────────────────────────────────────────────────
+
 void VideoPlayer::onMediaStatusChanged(QMediaPlayer::MediaStatus status)
 {
     switch (status) {
@@ -244,9 +228,7 @@ void VideoPlayer::onMediaStatusChanged(QMediaPlayer::MediaStatus status)
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// onPlaybackStateChanged — 버튼 텍스트 동기화
-// ─────────────────────────────────────────────────────────────
+// 버튼 텍스트 동기화
 void VideoPlayer::onPlaybackStateChanged(QMediaPlayer::PlaybackState state)
 {
     if (state == QMediaPlayer::PlayingState)
@@ -255,18 +237,14 @@ void VideoPlayer::onPlaybackStateChanged(QMediaPlayer::PlaybackState state)
         m_playBtn->setText("▶");
 }
 
-// ─────────────────────────────────────────────────────────────
-// onDurationChanged — 슬라이더 최대값 및 총 시간 갱신
-// ─────────────────────────────────────────────────────────────
+// 슬라이더 최대값 및 총 시간 갱신
 void VideoPlayer::onDurationChanged(qint64 duration)
 {
     m_progressSlider->setRange(0, static_cast<int>(duration / 1000));
     updateTimeLabel(m_player->position(), duration);
 }
 
-// ─────────────────────────────────────────────────────────────
-// onPositionChanged — 슬라이더 위치 및 시간 갱신
-// ─────────────────────────────────────────────────────────────
+// 슬라이더 위치 및 시간 갱신
 void VideoPlayer::onPositionChanged(qint64 position)
 {
     // 사용자가 슬라이더를 드래그 중일 때는 업데이트 안 함
@@ -276,17 +254,13 @@ void VideoPlayer::onPositionChanged(qint64 position)
     updateTimeLabel(position, m_player->duration());
 }
 
-// ─────────────────────────────────────────────────────────────
-// onSliderMoved — 슬라이더 드래그 → seek
-// ─────────────────────────────────────────────────────────────
+// 슬라이더 드래그
 void VideoPlayer::onSliderMoved(int position)
 {
     m_player->setPosition(static_cast<qint64>(position) * 1000);
 }
 
-// ─────────────────────────────────────────────────────────────
-// updateTimeLabel — "현재 / 전체" 형식으로 시간 표시
-// ─────────────────────────────────────────────────────────────
+// "현재 / 전체" 형식으로 시간 표시
 void VideoPlayer::updateTimeLabel(qint64 position, qint64 duration)
 {
     auto fmt = [](qint64 ms) -> QString {
@@ -298,9 +272,6 @@ void VideoPlayer::updateTimeLabel(qint64 position, qint64 duration)
     m_timeLabel->setText(fmt(position) + " / " + fmt(duration));
 }
 
-// ─────────────────────────────────────────────────────────────
-// downloadBackground
-// ─────────────────────────────────────────────────────────────
 void VideoPlayer::downloadBackground(const QString &url,
                                       const QString &filename)
 {
@@ -317,9 +288,6 @@ void VideoPlayer::downloadBackground(const QString &url,
     qDebug() << "[Video] 백그라운드 다운로드 시작:" << filename;
 }
 
-// ─────────────────────────────────────────────────────────────
-// onDownloadFinished
-// ─────────────────────────────────────────────────────────────
 void VideoPlayer::onDownloadFinished(QNetworkReply *reply)
 {
     QString filename = reply->request()
@@ -347,9 +315,7 @@ void VideoPlayer::onDownloadFinished(QNetworkReply *reply)
     reply->deleteLater();
 }
 
-// ─────────────────────────────────────────────────────────────
 // 헬퍼
-// ─────────────────────────────────────────────────────────────
 QString VideoPlayer::localPath(const QString &filename) const
 {
     return m_saveDir + "/" + filename;

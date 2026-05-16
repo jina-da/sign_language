@@ -39,7 +39,7 @@ LoginWidget::~LoginWidget()
     delete ui;
 }
 
-// ── 동적 상태 업데이트 ────────────────────────────────────────
+// 동적 상태 업데이트
 
 void LoginWidget::setConnected(bool connected)
 {
@@ -101,11 +101,6 @@ void LoginWidget::onTogglePassword()
     ui->eyeBtn->setText(hidden ? "🙈" : "👁");
 }
 
-// ─────────────────────────────────────────────────────────────
-// reset — 로그아웃 시 호출
-// 비밀번호 필드 초기화, 에러 레이블 숨김, 버튼 복원
-// 아이디는 saveIdBox 체크 여부에 따라 유지 또는 초기화
-// ─────────────────────────────────────────────────────────────
 void LoginWidget::reset()
 {
     // 비밀번호는 항상 초기화

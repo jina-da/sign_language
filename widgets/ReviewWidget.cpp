@@ -33,7 +33,7 @@ ReviewWidget::ReviewWidget(QWidget *parent)
     // resultCard 초기 숨김
     ui->resultCard->setStyleSheet("QWidget#resultCard { background: transparent; border: none; }"); ui->verdictLabel->setText(""); ui->confidenceLabel->setText("");
 
-    // ── VideoPlayer 위젯 교체 (StudyWidget.ui의 QLabel videoPlayer 자리에 삽입) ──
+    //  VideoPlayer 위젯 교체 (StudyWidget.ui의 QLabel videoPlayer 자리에 삽입)
     m_videoPlayer = new VideoPlayer(this);
     m_videoPlayer->setMinimumSize(ui->videoPlayer->minimumSize());
     m_videoPlayer->setFixedHeight(240);
@@ -90,16 +90,14 @@ ReviewWidget::~ReviewWidget()
     delete ui;
 }
 
-// ─────────────────────────────────────────────────────────────
 // showNoWordsMessage — 복습 단어 없을 때 안내
-// ─────────────────────────────────────────────────────────────
 void ReviewWidget::showNoWordsMessage(const QString &message)
 {
     ui->studyProgress->setMaximum(1);
     ui->studyProgress->setValue(0);
     ui->wordIndexLabel->setText("0 / 0");
 
-    ui->wordLabel->setText("📭");
+    ui->wordLabel->setText("");
     ui->meaningLabel->setText(message);
     ui->videoPlayer->setText("");
 
@@ -113,9 +111,7 @@ void ReviewWidget::showNoWordsMessage(const QString &message)
     qDebug() << "[Review] 단어 없음:" << message;
 }
 
-// ─────────────────────────────────────────────────────────────
 // setWordList
-// ─────────────────────────────────────────────────────────────
 void ReviewWidget::setWordList(const QList<WordInfo> &words)
 {
     m_words        = words;
@@ -125,9 +121,7 @@ void ReviewWidget::setWordList(const QList<WordInfo> &words)
     loadWord(0);
 }
 
-// ─────────────────────────────────────────────────────────────
 // loadWord
-// ─────────────────────────────────────────────────────────────
 void ReviewWidget::loadWord(int index)
 {
     if (m_words.isEmpty() || index >= m_words.size()) {
@@ -161,6 +155,7 @@ void ReviewWidget::loadWord(int index)
     // 영상 로드
     if (!w.videoCdnUrl.isEmpty()) {
         QString filename = w.videoCdnUrl.section('/', -1);
+        // QString filename = w.videoCdnUrl.split("/").last().split("?").first();
         m_videoPlayer->setCurrentWordId(w.id);
         m_videoPlayer->play(w.videoCdnUrl, filename);
     }
@@ -169,9 +164,7 @@ void ReviewWidget::loadWord(int index)
              << "(" << index+1 << "/" << m_words.size() << ")";
 }
 
-// ─────────────────────────────────────────────────────────────
 // onCameraFrame
-// ─────────────────────────────────────────────────────────────
 void ReviewWidget::onCameraFrame(const QImage &frame)
 {
     ui->cameraView->setPixmap(
@@ -181,16 +174,14 @@ void ReviewWidget::onCameraFrame(const QImage &frame)
             Qt::SmoothTransformation));
 }
 
-// ─────────────────────────────────────────────────────────────
 // onKeypointFrame
-// ─────────────────────────────────────────────────────────────
 void ReviewWidget::onKeypointFrame(const QJsonObject &keypoint)
 {
     if (!m_isRecording) return;
 
     m_keypointBuffer.append(keypoint);
 
-    // ── 움직임 감지: 이전 프레임과의 손목 좌표 변화량으로 판단 ──
+    // 움직임 감지: 이전 프레임과의 손목 좌표 변화량으로 판단
     static constexpr double MOTION_THRESHOLD = 19.2; // 픽셀 기준 (1920x1080 해상도, 약 1%)
 
     auto wrist = [](const QJsonObject &kp, const QString &side) -> QPointF {
@@ -217,9 +208,7 @@ void ReviewWidget::onKeypointFrame(const QJsonObject &keypoint)
         m_stopTimer->start();
 }
 
-// ─────────────────────────────────────────────────────────────
 // startRecording
-// ─────────────────────────────────────────────────────────────
 void ReviewWidget::startRecording()
 {
     if (m_isRecording) return;
@@ -236,9 +225,7 @@ void ReviewWidget::startRecording()
     qDebug() << "[Review] 녹화 시작";
 }
 
-// ─────────────────────────────────────────────────────────────
 // stopRecording
-// ─────────────────────────────────────────────────────────────
 void ReviewWidget::stopRecording()
 {
     if (!m_isRecording) return;
@@ -265,7 +252,6 @@ void ReviewWidget::stopRecording()
     const WordInfo &w = m_words[m_currentIndex];
     emit keypointReady(w.id, false, m_keypointBuffer);
 }
-
 
 void ReviewWidget::hideEvent(QHideEvent *event)
 {
@@ -352,9 +338,6 @@ void ReviewWidget::onCountdownTick()
 }
 void ReviewWidget::onRecordingTimeout() { stopRecording(); }
 
-// ─────────────────────────────────────────────────────────────
-// showResult
-// ─────────────────────────────────────────────────────────────
 void ReviewWidget::showResult(const QString &verdict,
                                double confidence,
                                int predictedWordId)
@@ -375,9 +358,6 @@ void ReviewWidget::showResult(const QString &verdict,
         ui->statusLabel->setText("다시 시도해 보세요.");
 }
 
-// ─────────────────────────────────────────────────────────────
-// applyVerdictStyle
-// ─────────────────────────────────────────────────────────────
 void ReviewWidget::applyVerdictStyle(const QString &verdict)
 {
     if (verdict == "correct") {
@@ -401,9 +381,6 @@ void ReviewWidget::applyVerdictStyle(const QString &verdict)
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// updateProgress
-// ─────────────────────────────────────────────────────────────
 void ReviewWidget::updateProgress()
 {
     int total   = m_words.size();
@@ -413,9 +390,7 @@ void ReviewWidget::updateProgress()
         QString("%1 / %2").arg(current).arg(total));
 }
 
-// ─────────────────────────────────────────────────────────────
-// showCompletionMessage — 복습 완료 시 버튼을 "완료"로 변경
-// ─────────────────────────────────────────────────────────────
+//복습 완료 시 버튼을 "완료"로 변경
 void ReviewWidget::showCompletionMessage()
 {
     ui->studyProgress->setValue(m_words.size());
@@ -432,9 +407,7 @@ void ReviewWidget::showCompletionMessage()
     qDebug() << "[Review] 복습 완료 → 완료 버튼 활성화";
 }
 
-// ─────────────────────────────────────────────────────────────
 // 버튼 슬롯
-// ─────────────────────────────────────────────────────────────
 void ReviewWidget::onPrevClicked()
 {
     if (m_currentIndex <= 0) return;
@@ -475,7 +448,7 @@ void ReviewWidget::onSkipClicked()
 
 void ReviewWidget::onReplayClicked()
 {
-    qDebug() << "[Review] 영상 다시 보기 (VideoPlayer 연동 예정)";
+    qDebug() << "[Review] 영상 다시 보기";
 }
 
 void ReviewWidget::onSpeedChanged()

@@ -8,6 +8,10 @@
 #include <QDebug>
 #include <QMenu>
 #include <QProcess>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QScrollArea>
+#include <QLabel>
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QMessageBox>
@@ -24,31 +28,31 @@ MainWindow::MainWindow(QWidget *parent)
     setupNavButtons();
     setupModeCards();
 
-    // ── 학습 탭(인덱스 1)에 StudyWidget 삽입 ────────
+    // 학습 탭(인덱스 1)에 StudyWidget 삽입
     m_studyWidget = new StudyWidget(this);
     ui->contentStack->removeWidget(ui->studyTab);
     ui->contentStack->insertWidget(1, m_studyWidget);
 
-    // ── 복습 탭(인덱스 2)에 ReviewWidget 삽입 ────────
+    // 복습 탭(인덱스 2)에 ReviewWidget 삽입
     m_reviewWidget = new ReviewWidget(this);
     ui->contentStack->removeWidget(ui->reviewTab);
     ui->contentStack->insertWidget(2, m_reviewWidget);
 
-    // ── 사전 탭(인덱스 3)에 DictWidget 삽입 ──────────
+    // 사전 탭(인덱스 3)에 DictWidget 삽입
     m_dictWidget = new DictWidget(this);
     ui->contentStack->removeWidget(ui->dictTab);
     ui->contentStack->insertWidget(3, m_dictWidget);
 
-    // ── 설정 탭(인덱스 5)에 SettingsWidget 삽입 ─────
+    // 설정 탭(인덱스 5)에 SettingsWidget 삽입
     m_settingsWidget = new SettingsWidget(this);
     ui->contentStack->removeWidget(ui->settingsTab);
     ui->contentStack->insertWidget(5, m_settingsWidget);
 
-    // ── 테스트 탭(네비 없음)으로 TestWidget 추가 ─────
+    // 테스트 탭(네비 없음)으로 TestWidget 추가
     m_testWidget = new TestWidget(this);
     ui->contentStack->addWidget(m_testWidget);
 
-    // ── KeypointClient → 프레임/키포인트: 현재 보이는 위젯만 처리 ──
+    // KeypointClient → 프레임/키포인트: 현재 보이는 위젯만 처리
     // frameReady: 카메라 영상은 모두 연결 (각 위젯이 isVisible로 필터링)
     connect(m_kpClient, &KeypointClient::frameReady,
             m_studyWidget, &StudyWidget::onCameraFrame);
@@ -83,7 +87,7 @@ MainWindow::MainWindow(QWidget *parent)
     // connectToServer는 Python stdout의 "[Server]" 확인 후 호출 (startKeypointServer 내부)
     startKeypointServer();
 
-    // ── userBtn 드롭다운 메뉴 ─────────────────────────
+    // userBtn 드롭다운 메뉴
     connect(ui->userBtn, &QPushButton::clicked,
             this, [this]{
         QMenu menu(this);
@@ -131,9 +135,7 @@ void MainWindow::stopKeypointServer()
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// showTestTab — 테스트 탭으로 전환 (네비 버튼 강조 없이)
-// ─────────────────────────────────────────────────────────────
+// 테스트 탭으로 전환
 void MainWindow::showTestTab()
 {
     // 네비 버튼은 모두 비활성 스타일로
@@ -158,7 +160,11 @@ void MainWindow::setupNavButtons()
         int idx = i;
         connect(m_navBtns[i], &QPushButton::clicked,
                 this, [this, idx]{
-            if (idx == 2) {
+            if (idx == 0) {
+                // 홈 탭: 탭 전환 후 REQ_DAILY_WORDS 재전송 시그널 emit
+                switchTab(0);
+                emit homeRequested();
+            } else if (idx == 2) {
                 // 복습 탭: REQ_REVIEW_WORDS 요청이 필요하므로 시그널만 emit
                 // 실제 화면 전환은 AppController → RES_REVIEW_WORDS 수신 후 switchToReview()
                 emit reviewModeRequested();
@@ -184,9 +190,41 @@ void MainWindow::setupModeCards()
     };
 
     addClick(ui->studyCard,  1, &MainWindow::studyModeRequested);
-    addClick(ui->reviewCard, 2, &MainWindow::reviewModeRequested);
+    // reviewCard: reviewModeRequested 시그널로 AppController가 처리
+    {
+        auto *btn = new QPushButton(ui->reviewCard);
+        btn->setGeometry(0, 0, 500, 200);
+        btn->setFlat(true);
+        btn->setStyleSheet("background:transparent; border:none;");
+        btn->raise();
+        connect(btn, &QPushButton::clicked, this, &MainWindow::reviewModeRequested);
+    }
     addClick(ui->dictCard,   3, &MainWindow::dictModeRequested);
     addClick(ui->gameCard,   4, &MainWindow::gameModeRequested);
+
+    // wordCard 내부에 스크롤 가능한 단어 목록 영역 동적 생성
+    // UI 파일에는 wordCardTitle 라벨만 있으므로 코드로 스크롤 영역을 추가
+    m_wordScrollArea = new QScrollArea(ui->wordCard);
+    m_wordScrollArea->setFrameShape(QFrame::NoFrame);
+    m_wordScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_wordScrollArea->setWidgetResizable(true);
+    m_wordScrollArea->setStyleSheet("background:transparent;");
+
+    m_wordListWidget = new QWidget;
+    m_wordListWidget->setStyleSheet("background:transparent;");
+    auto *vbox = new QVBoxLayout(m_wordListWidget);
+    vbox->setContentsMargins(0, 0, 0, 0);
+    vbox->setSpacing(0);
+
+    // 기본 안내 문구
+    auto *placeholder = new QLabel("아직 학습한 단어가 없습니다.");
+    placeholder->setStyleSheet("font-size:12px; color:#AAAAAA; padding:8px 0;");
+    placeholder->setObjectName("wordPlaceholder");
+    vbox->addWidget(placeholder);
+    vbox->addStretch();
+
+    m_wordScrollArea->setWidget(m_wordListWidget);
+    ui->wordCardLayout->addWidget(m_wordScrollArea);
 }
 
 void MainWindow::switchTab(int index)
@@ -245,6 +283,10 @@ void MainWindow::setTodayProgress(int done, int goal)
     ui->goalLabel->setText(QString("%1 / %2").arg(done).arg(goal));
     ui->progressText->setText(
         QString("단어 %1개 완료  ·  목표 %2개").arg(done).arg(goal));
+
+    // 학습 카드 뱃지: 남은 단어 수
+    int remaining = qMax(0, goal - done);
+    ui->studyBadge->setText(QString("%1단어 남음").arg(remaining));
 }
 
 void MainWindow::setDailyGoal(int goal)
@@ -255,9 +297,77 @@ void MainWindow::setDailyGoal(int goal)
     ui->goalLabel->setText(QString("%1 / %2").arg(m_todayDone).arg(goal));
     ui->progressText->setText(
         QString("단어 %1개 완료  ·  목표 %2개").arg(m_todayDone).arg(goal));
+
+    // 학습 카드 뱃지 갱신
+    int remaining = qMax(0, goal - m_todayDone);
+    ui->studyBadge->setText(QString("%1단어 남음").arg(remaining));
 }
 
 void MainWindow::setReviewCount(int count) { Q_UNUSED(count) }
+
+void MainWindow::setHomeBadges(int reviewPendingCount, int highScore)
+{
+    // 복습 카드: "N단어 대기"
+    ui->reviewBadge->setText(QString("%1단어 대기").arg(reviewPendingCount));
+
+    // 게임 카드: "최고 N점"
+    ui->gameBadge->setText(QString("최고 %1점").arg(highScore));
+
+    qDebug() << "[Main] 홈 뱃지 갱신 — 복습:" << reviewPendingCount
+             << "최고점:" << highScore;
+}
+
+void MainWindow::setLearnedWords(const QList<LearnedWord> &words)
+{
+    if (!m_wordListWidget) return;
+
+    // 기존 단어 행 전체 제거 후 재생성
+    auto *vbox = qobject_cast<QVBoxLayout*>(m_wordListWidget->layout());
+    if (!vbox) return;
+
+    // 레이아웃의 모든 아이템 삭제
+    QLayoutItem *item;
+    while ((item = vbox->takeAt(0)) != nullptr) {
+        if (item->widget()) item->widget()->deleteLater();
+        delete item;
+    }
+
+    if (words.isEmpty()) {
+        auto *placeholder = new QLabel("아직 학습한 단어가 없습니다.");
+        placeholder->setStyleSheet("font-size:12px; color:#AAAAAA; padding:8px 0;");
+        vbox->addWidget(placeholder);
+    } else {
+        for (const auto &w : words) {
+            // 한 행: [단어] [뜻] — 가로 레이아웃
+            auto *row = new QWidget;
+            row->setStyleSheet(
+                "border-bottom:1px solid #F0F0F0;"
+            );
+            auto *hbox = new QHBoxLayout(row);
+            hbox->setContentsMargins(0, 8, 0, 8);
+            hbox->setSpacing(12);
+
+            auto *wordLbl = new QLabel(w.word);
+            wordLbl->setStyleSheet(
+                "font-size:13px; font-weight:500; color:#2D2D2D; border:none;"
+            );
+            wordLbl->setFixedWidth(80);
+
+            auto *meaningLbl = new QLabel(w.meaning);
+            meaningLbl->setStyleSheet(
+                "font-size:12px; color:#888780; border:none;"
+            );
+            meaningLbl->setWordWrap(true);
+
+            hbox->addWidget(wordLbl);
+            hbox->addWidget(meaningLbl, 1);
+            vbox->addWidget(row);
+        }
+    }
+    vbox->addStretch();
+
+    qDebug() << "[Main] 오늘 학습 단어 목록 갱신:" << words.size() << "개";
+}
 
 QWidget* MainWindow::currentWidget() const
 {
@@ -275,17 +385,6 @@ void MainWindow::switchToReview()
     switchTab(2);
 }
 
-// ─────────────────────────────────────────────────────────────
-// startKeypointServer
-// 실행 파일 옆의 keypoint_server/keypoint_server.py 를 python으로 실행한다.
-// 이미 실행 중이면 중복 실행하지 않는다.
-// ─────────────────────────────────────────────────────────────
-// startKeypointServer
-// 우선순위:
-//   1. keypoint_server.exe  — 배포용 (pyinstaller 빌드 결과물)
-//   2. run_keypoint_server.bat — 개발용 (bat 안의 Python 절대경로 사용)
-//   3. python3 / python     — 폴백 (PATH에 등록된 경우)
-// ─────────────────────────────────────────────────────────────
 void MainWindow::startKeypointServer()
 {
     if (m_keypointProcess &&
@@ -295,7 +394,6 @@ void MainWindow::startKeypointServer()
     }
 
     // 이전 실행에서 정상 종료되지 않은 keypoint_server 프로세스 정리
-    // python.exe가 keypoint_server.py를 실행하므로 포트 점유 기준으로 종료
     qDebug() << "[KP] 포트 7000 점유 프로세스 정리 중...";
     QProcess findPort;
     findPort.start("cmd", { "/c",
@@ -340,7 +438,7 @@ void MainWindow::startKeypointServer()
             qDebug() << "[KP] keypoint_server 정상 종료";
     });
 
-    // ── 1순위: keypoint_server.exe (배포용) ──────────────────
+    // keypoint_server.exe (배포용)
     if (QFileInfo::exists(exePath)) {
         m_keypointProcess->start(exePath, {});
         if (m_keypointProcess->waitForStarted(2000)) {
@@ -352,7 +450,7 @@ void MainWindow::startKeypointServer()
         qDebug() << "[KP] .exe 시작 실패, 다음 방법 시도...";
     }
 
-    // ── 2순위: run_keypoint_server.bat (개발용) ───────────────
+    // run_keypoint_server.bat (개발용)
     if (QFileInfo::exists(batPath)) {
         // cmd /c: 콘솔 창 없이 bat 실행
         m_keypointProcess->start("cmd", { "/c", batPath });
@@ -365,7 +463,7 @@ void MainWindow::startKeypointServer()
         qDebug() << "[KP] bat 시작 실패, 다음 방법 시도...";
     }
 
-    // ── 3순위: python3 / python (폴백) ───────────────────────
+    // python3 / python (폴백)
     if (QFileInfo::exists(pyPath)) {
         for (const QString &exe : { QString("python3"), QString("python") }) {
             m_keypointProcess->start(exe, { pyPath });
@@ -381,11 +479,6 @@ void MainWindow::startKeypointServer()
     qDebug() << "[KP] 모든 방법 실패 — keypoint_server를 수동으로 실행해 주세요.";
 }
 
-// ─────────────────────────────────────────────────────────────
-// scheduleConnectFallback
-// Python stdout에서 "[Server]" 감지 시 connectToServer가 호출되지만,
-// stdout 버퍼링으로 신호가 늦거나 없을 경우를 위한 최대 10초 폴백.
-// ─────────────────────────────────────────────────────────────
 void MainWindow::scheduleConnectFallback()
 {
     QTimer::singleShot(10000, this, [this] {
